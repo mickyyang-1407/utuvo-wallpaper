@@ -9,7 +9,16 @@ import SwiftUI
 final class AppModel {
     // 瀏覽
     var wallpapers: [Wallpaper] = []
-    var selectedID: String?
+    /// 多選：集合＋錨點＋主要選取（主要選取給檢視器與設為桌布）。
+    var selection = SelectionState()
+    /// 相容舊介面：讀＝主要選取；寫＝單選那一張。
+    var selectedID: String? {
+        get { selection.primary }
+        set { selection = newValue.map { SelectionState(ids: [$0], anchor: $0, primary: $0) } ?? SelectionState() }
+    }
+    let tagStore: TagStore
+    /// 標籤變更計數，讓 SwiftUI 重繪（TagStore 本身不是 @Observable）。
+    private(set) var tagRevision = 0
     var thumbnails: [String: NSImage] = [:]
     private(set) var favoriteIDs: Set<String> = []
     var rotationFavoritesOnly = false {
@@ -51,6 +60,8 @@ final class AppModel {
     private let preferences: UserDefaults
     private let isBackgroundWorker: Bool
     private let serviceFactory: @MainActor () throws -> GenerationService
+    private let inUseWallpaperURLs: @MainActor () -> [URL]
+    private let bundleRoot: URL?
     private let credentialAvailable: @MainActor () -> Bool
     private var generationTask: Task<Void, Never>?
     private var dailyTimer: Timer?
@@ -70,8 +81,13 @@ final class AppModel {
          serviceFactory: (@MainActor () throws -> GenerationService)? = nil,
          credentialAvailable: (@MainActor () -> Bool)? = nil,
          preferences: UserDefaults = .standard,
-         isBackgroundWorker: Bool = false) {
+         isBackgroundWorker: Bool = false,
+         inUseWallpaperURLs: (@MainActor () -> [URL])? = nil,
+         bundleRoot: URL? = Bundle.main.bundleURL) {
         self.preferences = preferences
+        self.tagStore = TagStore(root: outputRoot)
+        self.inUseWallpaperURLs = inUseWallpaperURLs ?? { AppModel.currentDesktopURLs() }
+        self.bundleRoot = bundleRoot
         self.isBackgroundWorker = isBackgroundWorker
         self.desktop = desktop ?? DesktopController()
         self.rotation = rotation ?? RotationController()
@@ -110,11 +126,118 @@ final class AppModel {
     func reload() {
         wallpapers = WallpaperLibrary.load()
         thumbnails = [:]
-        if let selectedID, !wallpapers.contains(where: { $0.id == selectedID }) {
-            self.selectedID = wallpapers.first?.id
+        let present = Set(wallpapers.map(\.id))
+        if selection.ids.isEmpty == false {
+            var kept = selection
+            kept.ids.formIntersection(present)
+            if kept.ids.isEmpty { selectedID = wallpapers.first?.id; return }
+            if let primary = kept.primary, !present.contains(primary) { kept.primary = wallpapers.first { kept.ids.contains($0.id) }?.id }
+            if let anchor = kept.anchor, !present.contains(anchor) { kept.anchor = kept.primary }
+            selection = kept
         } else if selectedID == nil {
             selectedID = wallpapers.first?.id
         }
+    }
+
+    // MARK: - 多選
+
+    func click(_ wallpaper: Wallpaper, modifiers: SelectionModifiers, order: [String]) {
+        selection = SelectionLogic.click(selection, id: wallpaper.id, modifiers: modifiers, order: order)
+    }
+
+    func selectAll(order: [String]) { selection = SelectionLogic.selectAll(selection, order: order) }
+    func clearSelection() { selection = SelectionLogic.clear() }
+
+    var selectedWallpapers: [Wallpaper] { wallpapers.filter { selection.ids.contains($0.id) } }
+
+    // MARK: - 標籤
+
+    var tags: [WallpaperTag] { _ = tagRevision; return tagStore.tags }
+
+    func tags(for wallpaper: Wallpaper) -> [WallpaperTag] { _ = tagRevision; return tagStore.tags(for: wallpaper.id) }
+
+    func tagCount(_ name: String) -> Int {
+        _ = tagRevision
+        return tagStore.count(for: name, among: Set(wallpapers.map(\.id)))
+    }
+
+    func ids(withTag name: String) -> Set<String> { _ = tagRevision; return tagStore.ids(with: name) }
+
+    func allHaveTag(_ name: String, ids: Set<String>) -> Bool { _ = tagRevision; return tagStore.allHave(name, ids: ids) }
+
+    /// 統一處理標籤操作的錯誤訊息。
+    @discardableResult
+    func editTags(_ body: (TagStore) throws -> Void) -> Bool {
+        do {
+            try body(tagStore)
+            tagRevision += 1
+            return true
+        } catch {
+            errorMessage = (error as? TagStore.TagError)?.errorDescription ?? L("標籤無法儲存，請確認桌布資料夾可以寫入。")
+            return false
+        }
+    }
+
+    /// 對所有選取的圖切換標籤：全部都有 → 移除；否則全部加上。
+    func toggleTag(_ name: String, for ids: Set<String>) {
+        let assign = !tagStore.allHave(name, ids: ids)
+        editTags { try $0.set(name, assigned: assign, for: ids) }
+    }
+
+    // MARK: - 移到垃圾桶
+
+    struct TrashSummary: Equatable {
+        var trashed = 0
+        var skippedInUse = 0
+        var skippedOther = 0
+        var failed = 0
+        /// 移進垃圾桶後的位置（自測用來找回並清掉）。
+        var trashedURLs: [URL] = []
+    }
+
+    /// 刪除計畫（純函式包一層：帶入目前桌面使用中的檔與 bundle 位置）。
+    func deletionPlan(for ids: Set<String>) -> DeletionPlan {
+        let targets = wallpapers.filter { ids.contains($0.id) }.map { (id: $0.id, url: $0.url) }
+        return DeletionPlanner.plan(targets: targets, dataRoot: outputRoot, bundleRoot: bundleRoot,
+                                    inUse: inUseWallpaperURLs(),
+                                    exists: { FileManager.default.fileExists(atPath: $0.path) })
+    }
+
+    /// 依計畫移到垃圾桶（實際搬移只在 TrashMover）；刪完清收藏與標籤、reload、選下一張。
+    @discardableResult
+    func trash(ids: Set<String>, order: [String]) -> TrashSummary {
+        let plan = deletionPlan(for: ids)
+        var summary = TrashSummary()
+        summary.skippedInUse = plan.skipped.filter { $0.reason == .inUseAsWallpaper }.count
+        summary.skippedOther = plan.skipped.count - summary.skippedInUse
+        var removed = Set<String>()
+        for item in plan.items {
+            let outcome = TrashMover.moveToTrash(item.files)
+            summary.trashedURLs.append(contentsOf: outcome.trashed.values)
+            // 主圖移走才算刪除成功。
+            if outcome.trashed[item.files[0]] != nil { removed.insert(item.id); summary.trashed += 1 }
+            else { summary.failed += 1 }
+        }
+        if !removed.isEmpty {
+            let favorites = favoriteIDs.subtracting(removed)
+            if favorites != favoriteIDs { writeFavorites(favorites) }
+            editTags { try $0.removeAssignments(for: removed) }
+        }
+        reload()
+        selection = SelectionLogic.afterRemoval(removed: removed, previousOrder: order,
+                                                survivingOrder: wallpapers.map(\.id).filter { order.contains($0) })
+        if selection.ids.isEmpty, let first = wallpapers.first?.id { selectedID = first }
+        var parts = [L("已移到垃圾桶 \(summary.trashed) 張")]
+        if summary.skippedInUse > 0 { parts.append(L("略過 \(summary.skippedInUse) 張（正在當桌布）")) }
+        if summary.skippedOther > 0 { parts.append(L("略過 \(summary.skippedOther) 張（內建示範或不在資料夾內）")) }
+        if summary.failed > 0 { parts.append(L("\(summary.failed) 張無法移動")) }
+        statusMessage = parts.joined(separator: L("，")) + L("。")
+        return summary
+    }
+
+    /// 目前所有螢幕正在用的桌布檔。
+    static func currentDesktopURLs() -> [URL] {
+        NSScreen.screens.compactMap { NSWorkspace.shared.desktopImageURL(for: $0) }
     }
 
     func thumbnail(for wallpaper: Wallpaper) -> NSImage? {
@@ -136,6 +259,10 @@ final class AppModel {
     func toggleFavorite(_ wallpaper: Wallpaper) {
         var updated = favoriteIDs
         if !updated.insert(wallpaper.id).inserted { updated.remove(wallpaper.id) }
+        writeFavorites(updated)
+    }
+
+    private func writeFavorites(_ updated: Set<String>) {
         do {
             if updated.isEmpty {
                 if FileManager.default.fileExists(atPath: favoritesURL.path) {
@@ -298,8 +425,10 @@ final class AppModel {
         statusMessage = L("已停止輪換。")
     }
 
-    func activateDynamic() async {
-        guard DynamicScene.isReady else { errorMessage = L("四個時段尚未備齊。"); return }
+    /// `directory` 是場景庫挑的場景；nil＝目前場景（舊行為）。流程不變，只改用哪個場景目錄。
+    func activateDynamic(directory: URL? = nil) async {
+        let sceneDirectory = directory ?? DynamicScene.directory
+        guard DynamicSceneEntry.isComplete(sceneDirectory) else { errorMessage = L("四個時段尚未備齊。"); return }
         do {
             if !BackgroundService.isEnabled(in: preferences) {
                 guard let executable = Bundle.main.executableURL else { return }
@@ -307,7 +436,7 @@ final class AppModel {
             }
             setRotationMode(.off)
             preferences.set(true, forKey: "dynamic.enabled")
-            preferences.set(DynamicScene.directory.path, forKey: "dynamic.activeDirectory")
+            preferences.set(sceneDirectory.path, forKey: "dynamic.activeDirectory")
             preferences.removeObject(forKey: "dynamic.lastApplied")
             preferences.synchronize()
             dynamicRevision += 1
@@ -317,6 +446,15 @@ final class AppModel {
     }
 
     var isDynamicActive: Bool { preferences.bool(forKey: "dynamic.enabled") }
+
+    /// 背景正在用的場景目錄（日夜模式啟用時）。
+    var activeDynamicDirectory: URL? {
+        guard isDynamicActive else { return nil }
+        return preferences.string(forKey: "dynamic.activeDirectory").map { URL(fileURLWithPath: $0) } ?? DynamicScene.directory
+    }
+
+    /// 四時段生成進度：已完成幾步（順序 白天 → 清晨 → 黃昏 → 夜晚）。
+    private(set) var dynamicStepsDone = 0
 
     func startDynamicGeneration(prompt: String) {
         guard !isGenerating else { return }
@@ -335,12 +473,16 @@ final class AppModel {
             isGenerating = true
             errorMessage = nil
             generationProgress = L("準備四時段場景…")
+            dynamicStepsDone = 0
             generationTask = Task {
                 defer { isGenerating = false; generationLease = nil; generationProgress = "" }
                 do {
                     let scene = try await DynamicGenerator(provider: OpenAIImageProvider(apiKey: key))
                         .generate(prompt: prompt, directory: directory) { count in
-                            Task { @MainActor in self.generationProgress = L("已完成 \(count)／4 個時段") }
+                            Task { @MainActor in
+                                self.generationProgress = L("已完成 \(count)／4 個時段")
+                                self.dynamicStepsDone = count
+                            }
                         }
                     try scene.publish()
                     dynamicRevision += 1
