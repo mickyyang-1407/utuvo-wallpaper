@@ -43,12 +43,21 @@ enum BackgroundService {
         return try PropertyListSerialization.data(fromPropertyList: values, format: .xml, options: 0)
     }
 
+    /// A downloaded App opened from the disk image or quarantine runs from a temporary
+    /// path; a LaunchAgent pointing there stops working once that path disappears.
+    static func isTemporaryLocation(_ executableURL: URL) -> Bool {
+        let path = executableURL.standardizedFileURL.path
+        return path.contains("/AppTranslocation/") || path.hasPrefix("/Volumes/")
+            || path.hasPrefix("/private/var/folders/") || path.hasPrefix("/var/folders/")
+    }
+
     static func enable(executableURL: URL, defaults: UserDefaults = .standard) throws {
         var wrotePlist = false
         do {
             guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
                 throw BackgroundServiceError.invalidExecutable
             }
+            guard !isTemporaryLocation(executableURL) else { throw BackgroundServiceError.notInstalled }
             let data = try registrationPlist(executableURL: executableURL, dataDirectory: LabPaths.deliveryRoot)
             do {
                 try FileManager.default.createDirectory(at: plistURL.deletingLastPathComponent(),
@@ -122,6 +131,7 @@ enum BackgroundService {
 
 private enum BackgroundServiceError: LocalizedError {
     case invalidExecutable
+    case notInstalled
     case invalidDataDirectory
     case cannotWritePlist
     case cannotRemovePlist
@@ -131,6 +141,7 @@ private enum BackgroundServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidExecutable: return L("找不到可執行的背景工作程式。")
+        case .notInstalled: return L("請先把 UTUVO Wallpaper 拖到「應用程式」資料夾，從那裡打開後再啟用背景服務。")
         case .invalidDataDirectory: return L("背景工作的資料夾位置無效。")
         case .cannotWritePlist: return L("無法儲存背景排程設定。")
         case .cannotRemovePlist: return L("無法移除背景排程設定。")

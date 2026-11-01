@@ -2,9 +2,9 @@
 
 A small native macOS wallpaper app. It generates ten wallpapers in ten different styles every day with your own OpenAI API key, sorts them into categories, rotates them across all your displays, and can turn one scene into a day-to-night wallpaper that follows the time of day.
 
-[繁體中文](README.zh-Hant.md)
+[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.zip) · [繁體中文](README.zh-Hant.md)
 
-macOS 14 or later · tested on Apple silicon · English and 繁體中文 · MIT
+macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 
 ![UTUVO Wallpaper in English](docs/screenshots/en.png)
 
@@ -18,7 +18,14 @@ macOS 14 or later · tested on Apple silicon · English and 繁體中文 · MIT
 
 New pictures are generated at 3840 × 2160 and saved alongside a 6144 × 3456 version resampled with Core Graphics. That is resampling, not native 6K and not AI upscaling. The originals are kept.
 
-## Build
+## Install
+
+1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg) and drag **UTUVO Wallpaper** into **Applications**.
+2. Open it from Applications. It is signed with a Developer ID and notarized by Apple.
+3. Open **Settings** (⌘,) and paste your OpenAI API key. Without a key you can still browse the demo pictures.
+4. To keep generating and switching with the window closed, turn on the background service in Settings. It only works when the app runs from the Applications folder.
+
+## Build from source
 
 You need macOS 14 or later and Xcode or the Command Line Tools. There are no third-party packages.
 
@@ -29,7 +36,7 @@ bash build.sh
 open "Delivery/UTUVO Wallpaper.app"
 ```
 
-The build uses `swiftc` directly and signs the app ad hoc. It is not signed with a Developer ID or notarized. To use the background service, move the app to `~/Applications` first, then turn the service on in Settings.
+The build uses `swiftc` directly and signs the app ad hoc. Signed releases are made with `scripts/release.sh`, which builds a universal app, signs it with your Developer ID and notarizes the DMG and ZIP.
 
 ## Your API key
 
@@ -64,7 +71,7 @@ The self-test uses a temporary folder, a separate preferences suite, a fake imag
 
 ## Known limits
 
-- Tested on Apple silicon only.
+- Tested on Apple silicon; the Intel build was checked under Rosetta.
 - The day-and-night switching is done by the app's background service. The exported HEIC is a bonus; switching through macOS's own dynamic wallpaper support has not been verified.
 - Day-and-night generation runs in the app window, so keep it open until the four pictures are done.
 

@@ -2,7 +2,7 @@
 # 建立 UTUVO Wallpaper；可從任意來源目錄執行。
 #
 # 規則：
-# - 不安裝到 /Applications、不公證、不簽 Developer ID（只用 ad-hoc）。
+# - 不安裝到 /Applications、不公證；預設 ad-hoc 簽章，正式發行走 scripts/release.sh。
 # - 不開啟 App。
 # - 零新 package：只用 swiftc + 系統框架（AppKit / SwiftUI / ImageIO）。
 # - 不需要錄螢幕權限：本實驗只用 NSWorkspace 讀寫桌布路徑，不擷取畫面。
@@ -71,22 +71,37 @@ cp -R "$ROOT/Assets/Demo" "$RES_DIR/Demo"
 # 介面語言跟系統：繁中＝原文，其他語言＝英文（Localization/check.py 檢查缺翻譯）。
 cp -R "$ROOT/Localization/en.lproj" "$ROOT/Localization/zh-Hant.lproj" "$RES_DIR/"
 
-echo "==> 編譯（swiftc，swift-version ${SWIFT_VERSION}，target ${DEPLOYMENT_TARGET}，${ARCH}）"
-xcrun -sdk macosx swiftc \
-    -O \
-    -swift-version "${SWIFT_VERSION}" \
-    -target "${ARCH}-apple-macosx${DEPLOYMENT_TARGET}" \
-    -framework AppKit \
-    -framework SwiftUI \
-    -framework ImageIO \
-    -framework UniformTypeIdentifiers \
-    -framework Security \
-    -framework LocalAuthentication \
-    "${SRC}"/*.swift \
-    -o "${MACOS_DIR}/${EXECUTABLE}"
+# ARCHS="arm64 x86_64" 產生 universal；預設只編本機架構。
+ARCHS="${ARCHS:-$ARCH}"
+BUILD_TMP="$(mktemp -d)"
+trap 'rm -rf "$BUILD_TMP"' EXIT
+SLICES=()
+for arch in $ARCHS; do
+    echo "==> 編譯（swiftc，swift-version ${SWIFT_VERSION}，target ${DEPLOYMENT_TARGET}，${arch}）"
+    xcrun -sdk macosx swiftc \
+        -O \
+        -swift-version "${SWIFT_VERSION}" \
+        -target "${arch}-apple-macosx${DEPLOYMENT_TARGET}" \
+        -framework AppKit \
+        -framework SwiftUI \
+        -framework ImageIO \
+        -framework UniformTypeIdentifiers \
+        -framework Security \
+        -framework LocalAuthentication \
+        "${SRC}"/*.swift \
+        -o "${BUILD_TMP}/${EXECUTABLE}-${arch}"
+    SLICES+=("${BUILD_TMP}/${EXECUTABLE}-${arch}")
+done
+xcrun lipo -create "${SLICES[@]}" -output "${MACOS_DIR}/${EXECUTABLE}"
 
-echo "==> ad-hoc 簽章（不簽 Developer ID、不公證）"
-codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "   （略過簽章）"
+# SIGN_IDENTITY 指定 Developer ID 時啟用 hardened runtime＋時間戳（公證必要）；預設 ad-hoc。
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+    echo "==> 簽章：${SIGN_IDENTITY}（hardened runtime）"
+    codesign --force --options runtime --timestamp --sign "${SIGN_IDENTITY}" "$APP"
+else
+    echo "==> ad-hoc 簽章（不簽 Developer ID、不公證）"
+    codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "   （略過簽章）"
+fi
 
 echo "==> 完成：$APP"
 echo "    執行檔：${MACOS_DIR}/${EXECUTABLE}"

@@ -106,6 +106,7 @@
 "找不到 API key。請開啟設定，將自己的 OpenAI API key 儲存到 Mac 鑰匙圈；命令列也可使用 OPENAI_API_KEY。" = "No API key found. Open Settings and save your own OpenAI API key to the Mac Keychain; the command line can also use OPENAI_API_KEY.";
 "找不到任何螢幕。" = "No displays found.";
 "找不到任何螢幕，桌布沒有套用。" = "No displays found. Nothing was applied.";
+"請先把 UTUVO Wallpaper 拖到「應用程式」資料夾，從那裡打開後再啟用背景服務。" = "Move UTUVO Wallpaper to the Applications folder and open it from there before turning on the background service.";
 "找不到可執行的背景工作程式。" = "Couldn't find the background worker.";
 "找不到桌布" = "No Results";
 "抽象" = "Abstract";

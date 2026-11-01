@@ -422,6 +422,14 @@ enum SelfTest {
                    && !DailyBatch.isRetryable(GenerationError.httpStatus(401)),
                    "無真實API請求，無等待實際冷卻時間")
 
+            let placements = ["/Applications/UTUVO Wallpaper.app/Contents/MacOS/WallpaperLab": false,
+                              "/Users/me/Applications/UTUVO Wallpaper.app/Contents/MacOS/WallpaperLab": false,
+                              "/private/var/folders/x/AppTranslocation/ABC/d/UTUVO Wallpaper.app/Contents/MacOS/WallpaperLab": true,
+                              "/Volumes/UTUVO Wallpaper/UTUVO Wallpaper.app/Contents/MacOS/WallpaperLab": true]
+            let misplaced = placements.filter { BackgroundService.isTemporaryLocation(URL(fileURLWithPath: $0.key)) != $0.value }
+            record("背景註冊：從 DMG／隔離暫存位置執行時拒絕啟用，應用程式資料夾放行",
+                   misplaced.isEmpty, misplaced.isEmpty ? "\(placements.count) 例" : "誤判 \(misplaced.keys.sorted())")
+
             let categoryCases = [("nature-dawn-yab2mict-6k.jpg", "自然"), ("botanical-macro-daily-2026-11-01-6k.jpg", "自然"),
                                  ("gradient-tide-yyzw2mck-5k.jpg", "抽象"), ("paper-landscape-5k.png", "極簡"),
                                  ("watercolor-meadow-7y7q8kak-5k.jpg", "水彩"), ("nature-dawnish.jpg", "其他"),

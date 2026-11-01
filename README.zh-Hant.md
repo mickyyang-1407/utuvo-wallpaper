@@ -2,9 +2,9 @@
 
 小巧的 macOS 原生桌布 App。用你自己的 OpenAI API key，每天生成 10 張不同風格的桌布，自動分類，在所有螢幕上輪換；也能把一個場景做成跟著時間從清晨變到夜晚的日夜桌布。
 
-[English](README.md)
+[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.zip) · [English](README.md)
 
-macOS 14 以上 · 已在 Apple Silicon 測試 · English／繁體中文 · MIT
+macOS 14 以上 · Apple Silicon 與 Intel · English／繁體中文 · MIT
 
 ![UTUVO Wallpaper 中文介面](docs/screenshots/zh-Hant.png)
 
@@ -18,7 +18,14 @@ macOS 14 以上 · 已在 Apple Silicon 測試 · English／繁體中文 · MIT
 
 新圖原生 3840 × 2160，另存一張以 Core Graphics 重採樣的 6144 × 3456。這是重採樣，不是原生 6K，也不是 AI 超解析；原圖會保留。
 
-## 編譯
+## 安裝
+
+1. [下載 DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg)，把 **UTUVO Wallpaper** 拖進「應用程式」。
+2. 從「應用程式」打開。已用 Developer ID 簽章並通過 Apple 公證。
+3. 打開**設定**（⌘,），貼上你的 OpenAI API key。沒有 key 也能瀏覽示範圖。
+4. 想關掉視窗後仍每天生成與切換，到設定開啟背景服務；App 必須在「應用程式」資料夾裡才能開。
+
+## 從原始碼編譯
 
 需要 macOS 14 以上，以及 Xcode 或 Command Line Tools。沒有第三方套件。
 
@@ -29,7 +36,7 @@ bash build.sh
 open "Delivery/UTUVO Wallpaper.app"
 ```
 
-直接用 `swiftc` 編譯並做 ad-hoc 簽章，不是 Developer ID 簽署，也沒有公證。要用背景服務，請先把 App 放到 `~/Applications`，再到設定開啟。
+直接用 `swiftc` 編譯並做 ad-hoc 簽章，正式版用 `scripts/release.sh` 產生：編 universal、用你的 Developer ID 簽章，並把 DMG 與 ZIP 送 Apple 公證。
 
 ## API key
 
@@ -64,7 +71,7 @@ APP="Delivery/UTUVO Wallpaper.app/Contents/MacOS/WallpaperLab"
 
 ## 已知限制
 
-- 只在 Apple Silicon 測試過。
+- 在 Apple Silicon 測試；Intel 版以 Rosetta 驗過。
 - 日夜切換由 App 的背景服務負責。可匯出的 HEIC 是附加功能，macOS 原生動態桌布的全天切換未經驗證。
 - 日夜桌布的生成在 App 視窗中進行，四張完成前請保持開啟。
 
