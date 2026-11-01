@@ -120,7 +120,7 @@ enum SelectionLogic {
 // MARK: - 刪除計畫（純函式；實際搬移只在 TrashMover 一個地方）
 
 struct DeletionPlan: Equatable {
-    enum SkipReason: String, Equatable { case inUseAsWallpaper, bundledDemo, outsideDataRoot, symbolicLink }
+    enum SkipReason: String, Equatable { case inUseAsWallpaper, bundledDemo, outsideDataRoot, symbolicLink, missing }
 
     struct Item: Equatable {
         let id: String
@@ -170,7 +170,11 @@ enum DeletionPlanner {
             let image = canonical(target.url)
             if let bundle, isInside(image.path, bundle) { plan.skipped.append((target.id, .bundledDemo)); continue }
             if !isInside(image.path, root) { plan.skipped.append((target.id, .outsideDataRoot)); continue }
-            if probe(image) == .symbolicLink { plan.skipped.append((target.id, .symbolicLink)); continue }
+            switch probe(image) {
+            case .symbolicLink: plan.skipped.append((target.id, .symbolicLink)); continue
+            case .missing: plan.skipped.append((target.id, .missing)); continue
+            case .regular: break
+            }
             if inUsePaths.contains(image.path) { plan.skipped.append((target.id, .inUseAsWallpaper)); continue }
             var files = [image]
             /// 附屬檔：各自驗證在根目錄內、不是 symlink；有問題就略過那個檔並記錄。
