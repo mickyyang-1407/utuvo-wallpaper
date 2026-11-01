@@ -40,6 +40,8 @@ The build uses `swiftc` directly and signs the app ad hoc. Signed releases are m
 
 ## iPhone
 
+<img src="docs/screenshots/ios-en.png" alt="UTUVO Wallpaper on iPhone" width="300" align="right">
+
 The `ios/` folder holds the iPhone version (iOS 17 or later). It has the same ten styles, categories, favorites and day-and-night scenes, generated in portrait and cropped to your screen.
 
 iOS does not let apps change the wallpaper themselves, so the app works with Shortcuts:

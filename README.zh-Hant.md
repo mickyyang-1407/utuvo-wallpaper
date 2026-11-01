@@ -40,6 +40,8 @@ open "Delivery/UTUVO Wallpaper.app"
 
 ## iPhone 版
 
+<img src="docs/screenshots/ios-zh-Hant.png" alt="UTUVO Wallpaper iPhone 版" width="300" align="right">
+
 `ios/` 資料夾是 iPhone 版（iOS 17 以上）：同樣的 10 種風格、分類、收藏與日夜桌布，以直式生成並裁成你的螢幕尺寸。
 
 iOS 不允許 App 自己換桌布，所以搭配「捷徑」：
