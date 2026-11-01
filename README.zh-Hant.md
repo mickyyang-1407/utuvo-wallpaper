@@ -38,6 +38,25 @@ open "Delivery/UTUVO Wallpaper.app"
 
 直接用 `swiftc` 編譯並做 ad-hoc 簽章，正式版用 `scripts/release.sh` 產生：編 universal、用你的 Developer ID 簽章，並把 DMG 與 ZIP 送 Apple 公證。
 
+## iPhone 版
+
+`ios/` 資料夾是 iPhone 版（iOS 17 以上）：同樣的 10 種風格、分類、收藏與日夜桌布，以直式生成並裁成你的螢幕尺寸。
+
+iOS 不允許 App 自己換桌布，所以搭配「捷徑」：
+
+1. 打開「捷徑」App 的**自動化**，點 **+**，選**特定時間**，設定時間並選**立即執行**。
+2. 加入 UTUVO Wallpaper 的**取得目前桌布**，再加入系統內建的**設定背景圖片**，關掉**顯示預覽**。
+3. 日夜桌布請在 06:00、09:00、18:00、21:00 各建一個自動化。
+
+App 的**設定**裡有同樣的指南。每日的圖會在打開 App 時生成，iOS 也可能在夜間背景補做，但不保證準時。
+
+編譯需要 Xcode 與 [XcodeGen](https://github.com/yonaskolb/XcodeGen)：
+
+```sh
+cd ios && xcodegen generate
+open UTUVOWallpaper.xcodeproj
+```
+
 ## API key
 
 生圖使用 OpenAI Images API（`gpt-image-2`），費用由**你自己的** OpenAI 帳號支付。每張圖一次請求；一組日夜桌布是一次生成加三次編修。沒有 key 也能瀏覽內附的示範圖。

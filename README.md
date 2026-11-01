@@ -38,6 +38,25 @@ open "Delivery/UTUVO Wallpaper.app"
 
 The build uses `swiftc` directly and signs the app ad hoc. Signed releases are made with `scripts/release.sh`, which builds a universal app, signs it with your Developer ID and notarizes the DMG and ZIP.
 
+## iPhone
+
+The `ios/` folder holds the iPhone version (iOS 17 or later). It has the same ten styles, categories, favorites and day-and-night scenes, generated in portrait and cropped to your screen.
+
+iOS does not let apps change the wallpaper themselves, so the app works with Shortcuts:
+
+1. In the Shortcuts app, open **Automation**, tap **+**, choose **Time of Day**, pick a time and **Run Immediately**.
+2. Add the **Get Current Wallpaper** action from UTUVO Wallpaper, then the built-in **Set Wallpaper** action, and turn off **Show Preview**.
+3. For day and night, make four automations at 06:00, 09:00, 18:00 and 21:00.
+
+The app has the same guide under **Settings**. Daily pictures are generated when you open the app, and iOS may also run the batch in the background overnight; it does not promise an exact time.
+
+To build it you need Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+
+```sh
+cd ios && xcodegen generate
+open UTUVOWallpaper.xcodeproj
+```
+
 ## Your API key
 
 Generating pictures uses the OpenAI Images API (`gpt-image-2`) and is billed to **your** OpenAI account. Each picture is one request; a day-and-night scene is one generation plus three edits. Without a key you can still browse the bundled demo pictures.
