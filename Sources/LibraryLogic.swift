@@ -90,6 +90,18 @@ enum SelectionLogic {
         return SelectionState(ids: Set(order), anchor: state.anchor ?? primary, primary: primary)
     }
 
+    /// 換側欄區段或搜尋文字後：選取裁成畫面上看得到的項目，不保留看不到的隱藏選取。
+    static func restrict(_ state: SelectionState, toVisible order: [String]) -> SelectionState {
+        let visible = Set(order)
+        var next = state
+        next.ids.formIntersection(visible)
+        guard !next.ids.isEmpty else { return SelectionState() }
+        if let primary = next.primary, !next.ids.contains(primary) { next.primary = order.first { next.ids.contains($0) } }
+        if next.primary == nil { next.primary = order.first { next.ids.contains($0) } }
+        if let anchor = next.anchor, !next.ids.contains(anchor) { next.anchor = next.primary }
+        return next
+    }
+
     /// Esc：清空。
     static func clear() -> SelectionState { SelectionState() }
 
@@ -108,51 +120,72 @@ enum SelectionLogic {
 // MARK: - 刪除計畫（純函式；實際搬移只在 TrashMover 一個地方）
 
 struct DeletionPlan: Equatable {
-    enum SkipReason: String, Equatable { case inUseAsWallpaper, bundledDemo, outsideDataRoot }
+    enum SkipReason: String, Equatable { case inUseAsWallpaper, bundledDemo, outsideDataRoot, symbolicLink }
 
     struct Item: Equatable {
         let id: String
-        /// 要移到垃圾桶的檔案（主圖、sidecar、對應原圖；只列存在的）。
+        /// 要移到垃圾桶的檔案（主圖、sidecar、對應原圖；只列存在、在資料根目錄內、不是 symlink 的）。
+        /// 都是已驗證過的實際位置（上層目錄已解開 symlink），搬移時直接用這些 URL。
         let files: [URL]
     }
 
     var items: [Item] = []
     var skipped: [(id: String, reason: SkipReason)] = []
+    /// 主圖可刪、但附屬檔（sidecar／原圖）因 symlink 或越界被略過的，留下紀錄。
+    var skippedFiles: [(url: URL, reason: SkipReason)] = []
 
     static func == (lhs: DeletionPlan, rhs: DeletionPlan) -> Bool {
         lhs.items == rhs.items && lhs.skipped.map(\.id) == rhs.skipped.map(\.id)
             && lhs.skipped.map(\.reason) == rhs.skipped.map(\.reason)
+            && lhs.skippedFiles.map(\.url) == rhs.skippedFiles.map(\.url)
     }
 
     var fileCount: Int { items.reduce(0) { $0 + $1.files.count } }
 }
 
+enum FileKind: Equatable { case missing, regular, symbolicLink }
+
 enum DeletionPlanner {
+    /// 真實檔案系統：用 lstat，不跟隨 symlink。
+    static func probe(_ url: URL) -> FileKind {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return .missing }
+        return (info.st_mode & S_IFMT) == S_IFLNK ? .symbolicLink : .regular
+    }
+
     /// - Parameters:
     ///   - targets: 要刪的圖（id 與檔案位置）
     ///   - dataRoot: 資料根目錄；不在它底下的檔案一律略過
     ///   - bundleRoot: App bundle（內建示範）位置
     ///   - inUse: 目前任一螢幕正在用的桌布檔
-    ///   - exists: 檔案是否存在（注入，測試不必真的建檔）
+    ///   - probe: 檔案狀態（注入，測試不必真的建檔）
     static func plan(targets: [(id: String, url: URL)], dataRoot: URL, bundleRoot: URL?,
-                     inUse: [URL], exists: (URL) -> Bool) -> DeletionPlan {
-        let root = canonical(dataRoot)
-        let bundle = bundleRoot.map(canonical)
-        let inUsePaths = Set(inUse.map(canonical))
+                     inUse: [URL], probe: (URL) -> FileKind = DeletionPlanner.probe) -> DeletionPlan {
+        let root = canonical(dataRoot).path
+        let bundle = bundleRoot.map { canonical($0).path }
+        let inUsePaths = Set(inUse.map { $0.standardizedFileURL.resolvingSymlinksInPath().path })
         var plan = DeletionPlan()
         for target in targets {
-            let path = canonical(target.url)
-            if let bundle, isInside(path, bundle) { plan.skipped.append((target.id, .bundledDemo)); continue }
-            if !isInside(path, root) { plan.skipped.append((target.id, .outsideDataRoot)); continue }
-            if inUsePaths.contains(path) { plan.skipped.append((target.id, .inUseAsWallpaper)); continue }
-            var files = [target.url]
-            let sidecar = target.url.deletingPathExtension().appendingPathExtension("provenance.json")
-            if exists(sidecar) { files.append(sidecar) }
-            if let original = originalURL(for: target.url, dataRoot: dataRoot), exists(original),
-               isInside(canonical(original), root) {
-                files.append(original)
-                let originalSidecar = original.deletingPathExtension().appendingPathExtension("provenance.json")
-                if exists(originalSidecar) { files.append(originalSidecar) }
+            let image = canonical(target.url)
+            if let bundle, isInside(image.path, bundle) { plan.skipped.append((target.id, .bundledDemo)); continue }
+            if !isInside(image.path, root) { plan.skipped.append((target.id, .outsideDataRoot)); continue }
+            if probe(image) == .symbolicLink { plan.skipped.append((target.id, .symbolicLink)); continue }
+            if inUsePaths.contains(image.path) { plan.skipped.append((target.id, .inUseAsWallpaper)); continue }
+            var files = [image]
+            /// 附屬檔：各自驗證在根目錄內、不是 symlink；有問題就略過那個檔並記錄。
+            func attach(_ candidate: URL) -> Bool {
+                let url = canonical(candidate)
+                switch probe(url) {
+                case .missing: return false
+                case .symbolicLink: plan.skippedFiles.append((url, .symbolicLink)); return false
+                case .regular:
+                    guard isInside(url.path, root) else { plan.skippedFiles.append((url, .outsideDataRoot)); return false }
+                    files.append(url); return true
+                }
+            }
+            _ = attach(image.deletingPathExtension().appendingPathExtension("provenance.json"))
+            if let original = originalURL(for: image, dataRoot: URL(fileURLWithPath: root, isDirectory: true)), attach(original) {
+                _ = attach(canonical(original).deletingPathExtension().appendingPathExtension("provenance.json"))
             }
             plan.items.append(.init(id: target.id, files: files))
         }
@@ -169,8 +202,11 @@ enum DeletionPlanner {
         return dataRoot.appendingPathComponent("originals", isDirectory: true).appendingPathComponent(base + ".png")
     }
 
-    static func canonical(_ url: URL) -> String {
-        url.standardizedFileURL.resolvingSymlinksInPath().path
+    /// 實際位置：上層目錄解開 symlink，最後一段保留原名（不跟隨 symlink 本身，才驗得出它是 symlink）。
+    static func canonical(_ url: URL) -> URL {
+        let standardized = url.standardizedFileURL
+        let parent = standardized.deletingLastPathComponent().resolvingSymlinksInPath()
+        return parent.appendingPathComponent(standardized.lastPathComponent).standardizedFileURL
     }
 
     static func isInside(_ path: String, _ root: String) -> Bool {

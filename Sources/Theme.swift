@@ -22,6 +22,19 @@ enum WallpaperPalette {
     static let orange = hex(0xFF9F0A)
     static let blue = hex(0x0A84FF)
     static let red = hex(0xFF453A)
+    /// 破壞性按鈕底色（白字對比 ≥ 4.5:1）。
+    static let destructive = hex(0xC42B2B)
+
+    /// 標籤色顯示用：飽和度降約 22%，不搶桌布（存檔的色碼不變）。
+    static func muted(_ string: String) -> Color {
+        let trimmed = string.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
+        guard trimmed.count == 6, let value = UInt32(trimmed, radix: 16) else { return hex(0x8E8E93) }
+        let color = NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+                            blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+        var h: CGFloat = 0, sat: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getHue(&h, saturation: &sat, brightness: &b, alpha: &a)
+        return Color(nsColor: NSColor(hue: h, saturation: sat * 0.78, brightness: b * 0.94, alpha: 1))
+    }
 
     /// 解析度級距對應的玻璃方塊（同色）。
     static func resolutionGlass(_ tier: ResolutionTier) -> String {
@@ -344,5 +357,38 @@ struct GlassPanel: ViewModifier {
 extension View {
     func glassPanel(radius: CGFloat = 16, tint: Color? = nil) -> some View {
         modifier(GlassPanel(radius: radius, tint: tint))
+    }
+}
+
+
+/// 紅底白字的破壞性膠囊按鈕（不用玻璃，確保對比）。
+struct DestructiveCapsuleStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(WallpaperPalette.destructive.opacity(configuration.isPressed ? 0.85 : 1)))
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(Capsule())
+    }
+}
+
+/// 不透明中性膠囊按鈕（確認視窗的「取消」）。
+struct NeutralSolidCapsuleStyle: ButtonStyle {
+    @Environment(\.colorScheme) private var scheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(scheme == .dark ? Color.white.opacity(configuration.isPressed ? 0.2 : 0.14)
+                                                         : Color.black.opacity(configuration.isPressed ? 0.12 : 0.07)))
+            .contentShape(Capsule())
     }
 }

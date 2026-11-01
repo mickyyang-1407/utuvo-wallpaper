@@ -24,6 +24,8 @@ final class TagStore {
     private(set) var document = TagDocument()
     /// 最近一次載入時若發現壞檔，被改名到的位置（給 UI／測試讀）。
     private(set) var recoveredCorruptURL: URL?
+    /// 檔案存在卻讀不了、或壞檔無法改名備份：唯讀，絕不寫入（避免覆蓋使用者的檔案）。
+    private(set) var isReadOnly = false
 
     init(root: URL) {
         url = root.appendingPathComponent("tags.json")
@@ -32,7 +34,12 @@ final class TagStore {
 
     func load() {
         recoveredCorruptURL = nil
-        guard let data = try? Data(contentsOf: url) else { document = TagDocument(); return }
+        isReadOnly = false
+        guard FileManager.default.fileExists(atPath: url.path) else { document = TagDocument(); return }
+        guard let data = try? Data(contentsOf: url) else {
+            // 存在但讀不到（權限等）：不能當成空集合再寫回去。
+            document = TagDocument(); isReadOnly = true; return
+        }
         if let decoded = try? JSONDecoder().decode(TagDocument.self, from: data) {
             document = TagStore.normalized(decoded)
             return
@@ -45,8 +52,13 @@ final class TagStore {
             target = url.deletingLastPathComponent().appendingPathComponent("tags.corrupt-\(stamp)-\(suffix).json")
             suffix += 1
         }
-        if (try? FileManager.default.moveItem(at: url, to: target)) != nil { recoveredCorruptURL = target }
         document = TagDocument()
+        if (try? FileManager.default.moveItem(at: url, to: target)) != nil {
+            recoveredCorruptURL = target
+        } else {
+            // 救援失敗：壞檔還在原位，進入唯讀，之後任何寫入都拒絕。
+            isReadOnly = true
+        }
     }
 
     private static let stampFormatter: DateFormatter = {
@@ -94,12 +106,13 @@ final class TagStore {
     // MARK: - 修改（每個都立即原子寫入；失敗丟錯、記憶體不變）
 
     enum TagError: LocalizedError, Equatable {
-        case emptyName, duplicateName, notFound
+        case emptyName, duplicateName, notFound, readOnly
         var errorDescription: String? {
             switch self {
             case .emptyName: return L("標籤名稱不能是空白。")
             case .duplicateName: return L("已經有同名的標籤。")
             case .notFound: return L("找不到這個標籤。")
+            case .readOnly: return L("標籤檔損壞且無法備份；為了不覆蓋它，標籤暫時無法儲存。")
             }
         }
     }
@@ -163,6 +176,14 @@ final class TagStore {
     }
 
     private func commit(_ candidate: TagDocument) throws {
+        guard !isReadOnly else { throw TagError.readOnly }
+        // 寫入前再確認一次：磁碟上的檔若已變成讀不了或解不開，就不覆蓋它。
+        if FileManager.default.fileExists(atPath: url.path) {
+            guard let data = try? Data(contentsOf: url), (try? JSONDecoder().decode(TagDocument.self, from: data)) != nil else {
+                isReadOnly = true
+                throw TagError.readOnly
+            }
+        }
         let next = TagStore.normalized(candidate)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()

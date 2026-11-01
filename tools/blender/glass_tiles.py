@@ -9,7 +9,7 @@
 
 材質：有厚度的彩色玻璃（邊緣折射、內側高光、底部柔和色光）。Cycles 固定取樣與種子，重跑結果相同。
 """
-import bpy, sys, os, math, time
+import bpy, sys, os, math, time, colorsys
 
 # STYLE.md 的 13 個顏色（名稱 → #RRGGBB）
 TILES = [
@@ -33,8 +33,15 @@ def srgb_to_linear(c):
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 
+# 飽和度降約 22%、亮度略降：玻璃方塊是配角，不要螢光感，讓桌布當主角。
+SATURATION = 0.78
+VALUE = 0.94
+
+
 def hex_color(h, alpha=1.0):
     r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    hue, sat, val = colorsys.rgb_to_hsv(r, g, b)
+    r, g, b = colorsys.hsv_to_rgb(hue, sat * SATURATION, val * VALUE)
     return (srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b), alpha)
 
 
@@ -144,7 +151,8 @@ def rounded_rect_curve(name, size, radius, extrude=0.0, bevel=0.0, z=0.0, resolu
 
 SIZE = 2.0
 RADIUS = SIZE * 0.26
-slab = rounded_rect_curve("Slab", SIZE - 0.12, RADIUS - 0.06, extrude=0.10, bevel=0.06)
+# 玻璃更厚、邊緣圓角更大：側緣的折射與高光更明顯。
+slab = rounded_rect_curve("Slab", SIZE - 0.18, RADIUS - 0.09, extrude=0.14, bevel=0.09)
 core = rounded_rect_curve("Core", SIZE - 0.06, RADIUS - 0.03, z=-0.09)
 
 # 燈光：左上大面光（上緣高光）、右下小面光（邊緣反光）。
@@ -175,7 +183,7 @@ def glass_material(color):
     bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
     bsdf.inputs["Base Color"].default_value = mix(color, (1, 1, 1, 1), 0.35)
     bsdf.inputs["Roughness"].default_value = 0.14
-    bsdf.inputs["IOR"].default_value = 1.5
+    bsdf.inputs["IOR"].default_value = 1.62
     for key in ("Transmission Weight", "Transmission"):
         if key in bsdf.inputs:
             bsdf.inputs[key].default_value = 1.0
@@ -205,14 +213,14 @@ def core_material(color):
     # 下緣（Y=0）是柔和的色光，往上回到本色，頂端略亮。
     elements = ramp.color_ramp.elements
     elements[0].position = 0.0
-    elements[0].color = mix(color, (1, 1, 1, 1), 0.38)
+    elements[0].color = mix(color, (1, 1, 1, 1), 0.5)
     elements[1].position = 1.0
     elements[1].color = mix(color, (1, 1, 1, 1), 0.10)
-    mid = elements.new(0.32)
+    mid = elements.new(0.42)
     mid.color = mix(color, (0, 0, 0, 1), 0.12)
     links.new(ramp.outputs["Color"], emit.inputs["Color"])
     links.new(ramp.outputs["Color"], diffuse.inputs["Color"])
-    emit.inputs["Strength"].default_value = 0.85
+    emit.inputs["Strength"].default_value = 0.6
     links.new(emit.outputs["Emission"], add.inputs[0])
     links.new(diffuse.outputs["BSDF"], add.inputs[1])
     links.new(add.outputs["Shader"], out.inputs["Surface"])

@@ -65,6 +65,32 @@ extension SelfTest {
                    rescued.tags.map(\.name) == ["新"] && corruptKept && named && corruptStill,
                    corruptURL?.lastPathComponent ?? "沒有改名")
 
+            // 救援失敗（資料夾不可寫，壞檔改不了名）→ 唯讀、拒絕寫入、壞檔原封不動。
+            let lockedRoot = tempRoot.appendingPathComponent("tag-locked", isDirectory: true)
+            try fm.createDirectory(at: lockedRoot, withIntermediateDirectories: true)
+            let lockedFile = lockedRoot.appendingPathComponent("tags.json")
+            try corrupt.write(to: lockedFile)
+            try fm.setAttributes([.posixPermissions: 0o555], ofItemAtPath: lockedRoot.path)
+            let locked = TagStore(root: lockedRoot)
+            var refused = false
+            do { try locked.addTag(name: "會覆蓋嗎", color: "#0A84FF") } catch let error as TagStore.TagError { refused = error == .readOnly }
+            let lockedUntouched = (try? Data(contentsOf: lockedFile)) == corrupt
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: lockedRoot.path)
+            record("標籤：壞檔救援失敗 → 唯讀、拒絕寫入、壞檔不被覆蓋",
+                   locked.isReadOnly && refused && lockedUntouched && locked.recoveredCorruptURL == nil,
+                   "唯讀 = \(locked.isReadOnly)、拒絕 = \(refused)")
+
+            // 載入後檔案才被弄壞：寫入前會再檢查，不覆蓋。
+            let lateRoot = tempRoot.appendingPathComponent("tag-late", isDirectory: true)
+            try fm.createDirectory(at: lateRoot, withIntermediateDirectories: true)
+            let late = TagStore(root: lateRoot)
+            try late.addTag(name: "一", color: "#0A84FF")
+            try corrupt.write(to: late.url)
+            var lateRefused = false
+            do { try late.addTag(name: "二", color: "#0A84FF") } catch let error as TagStore.TagError { lateRefused = error == .readOnly }
+            record("標籤：寫入前發現磁碟上的檔已壞 → 拒絕寫入、不覆蓋",
+                   lateRefused && (try? Data(contentsOf: late.url)) == corrupt, "拒絕 = \(lateRefused)")
+
             let leftovers = (try? fm.contentsOfDirectory(atPath: tagRoot.path))?.filter { $0.hasSuffix(".tmp") } ?? []
             record("標籤：原子寫入不留暫存檔", leftovers.isEmpty, "暫存檔 \(leftovers.count) 個")
         } catch {
@@ -115,9 +141,17 @@ extension SelfTest {
                    && afterDelete.primary == "d" && afterDeleteTail.primary == "c",
                "刪 b,c → \(afterDelete.primary ?? "-")；刪 d,e → \(afterDeleteTail.primary ?? "-")")
 
-        // MARK: DeletionPlanner（只用假路徑＋注入 exists，不建檔）
-        let root = URL(fileURLWithPath: "/tmp/utuvo-plan-root", isDirectory: true)
-        let bundle = URL(fileURLWithPath: "/tmp/utuvo-plan-bundle/UTUVO Wallpaper.app", isDirectory: true)
+        let wide = SelectionState(ids: ["a", "c", "e"], anchor: "a", primary: "e")
+        let narrowed = SelectionLogic.restrict(wide, toVisible: ["b", "c", "d"])
+        let kept = SelectionLogic.restrict(wide, toVisible: order)
+        let none = SelectionLogic.restrict(wide, toVisible: ["b", "d"])
+        record("多選：換區段／搜尋後選取裁成可見項目（主要選取與錨點跟著移），全部看不到就清空",
+               narrowed == SelectionState(ids: ["c"], anchor: "c", primary: "c") && kept == wide && none == SelectionState(),
+               "裁後 = \(narrowed.ids.sorted())")
+
+        // MARK: DeletionPlanner（只用假路徑＋注入 probe，不建檔；路徑放在不存在的根目錄下，避開 /tmp 的 symlink）
+        let root = URL(fileURLWithPath: "/utuvo-plan-root", isDirectory: true)
+        let bundle = URL(fileURLWithPath: "/utuvo-plan-bundle/UTUVO Wallpaper.app", isDirectory: true)
         let w = root.appendingPathComponent("wallpapers", isDirectory: true)
         let six = w.appendingPathComponent("nature-dawn-abc123-6k.jpg")
         let sixSidecar = w.appendingPathComponent("nature-dawn-abc123-6k.provenance.json")
@@ -125,12 +159,12 @@ extension SelfTest {
         let noOriginal = w.appendingPathComponent("gradient-tide-zzz-6k.jpg")
         let inUse = w.appendingPathComponent("cosmic-nebula-q1-6k.jpg")
         let demo = bundle.appendingPathComponent("Contents/Resources/Demo/wallpapers/paper-landscape-demo-5k.jpg")
-        let outside = URL(fileURLWithPath: "/tmp/elsewhere/x-6k.jpg")
+        let outside = URL(fileURLWithPath: "/utuvo-elsewhere/x-6k.jpg")
         let existing: Set<String> = [six.path, sixSidecar.path, sixOriginal.path, noOriginal.path, inUse.path, demo.path, outside.path]
         let plan = DeletionPlanner.plan(
             targets: [(six.lastPathComponent, six), (noOriginal.lastPathComponent, noOriginal),
                       (inUse.lastPathComponent, inUse), (demo.lastPathComponent, demo), (outside.lastPathComponent, outside)],
-            dataRoot: root, bundleRoot: bundle, inUse: [inUse], exists: { existing.contains($0.path) })
+            dataRoot: root, bundleRoot: bundle, inUse: [inUse], probe: { existing.contains($0.path) ? .regular : .missing })
         let mapped = plan.items.first?.files == [six, sixSidecar, sixOriginal]
         let missingOriginalSkipped = plan.items.count == 2 && plan.items[1].files == [noOriginal]
         record("刪除計畫：6K 對應原圖＋sidecar；找不到原圖就略過原圖", mapped && missingOriginalSkipped,
@@ -139,10 +173,19 @@ extension SelfTest {
         record("刪除計畫：略過正在當桌布、bundle 示範、資料根目錄外",
                reasons == [.inUseAsWallpaper, .bundledDemo, .outsideDataRoot],
                "略過 = \(reasons.map(\.rawValue))")
-        let prefixTrick = DeletionPlanner.plan(targets: [("y", URL(fileURLWithPath: "/tmp/utuvo-plan-root-other/wallpapers/y-6k.jpg"))],
-                                               dataRoot: root, bundleRoot: nil, inUse: [], exists: { _ in true })
+        let prefixTrick = DeletionPlanner.plan(targets: [("y", URL(fileURLWithPath: "/utuvo-plan-root-other/wallpapers/y-6k.jpg"))],
+                                               dataRoot: root, bundleRoot: nil, inUse: [], probe: { _ in .regular })
         record("刪除計畫：名稱前綴相同的外部資料夾不算在資料根目錄內",
-               prefixTrick.items.isEmpty && prefixTrick.skipped.first?.reason == .outsideDataRoot, "/tmp/utuvo-plan-root-other")
+               prefixTrick.items.isEmpty && prefixTrick.skipped.first?.reason == .outsideDataRoot, "/utuvo-plan-root-other")
+        let linkPlan = DeletionPlanner.plan(targets: [("s", six), ("l", noOriginal)], dataRoot: root, bundleRoot: nil, inUse: [],
+            probe: { url in
+                if url.path == sixSidecar.path || url.path == noOriginal.path { return .symbolicLink }
+                return existing.contains(url.path) ? .regular : .missing
+            })
+        record("刪除計畫：symlink 主圖整張略過；symlink 附屬檔只略過那個檔並記錄",
+               linkPlan.items.map(\.id) == ["s"] && linkPlan.items.first?.files == [six, sixOriginal]
+                   && linkPlan.skipped.first?.reason == .symbolicLink && linkPlan.skippedFiles.map(\.url) == [sixSidecar],
+               "略過 \(linkPlan.skipped.map(\.id))、附屬略過 \(linkPlan.skippedFiles.count) 個")
 
         // MARK: Dynamic 時間軸與場景庫
         let segments = DynamicPhase.timelineSegments
@@ -213,16 +256,27 @@ extension SelfTest {
             let names = ["nature-dawn-t1", "nature-dawn-t2", "nature-dawn-t3"]
             for name in names {
                 try png.write(to: wallpapers.appendingPathComponent("\(name)-6k.png"))
-                try Data(#"{"origin":"resampled"}"#.utf8).write(to: wallpapers.appendingPathComponent("\(name)-6k.provenance.json"))
+                if name != "nature-dawn-t2" {
+                    try Data(#"{"origin":"resampled"}"#.utf8).write(to: wallpapers.appendingPathComponent("\(name)-6k.provenance.json"))
+                }
                 try png.write(to: originals.appendingPathComponent("\(name).png"))
             }
+            // 資料根目錄內指向外部檔案的 symlink：主圖一張、t2 的 sidecar 一個。都必須略過，外部檔案原地不動。
+            let outsideDir = tempRoot.appendingPathComponent("outside-fixture", isDirectory: true)
+            try fm.createDirectory(at: outsideDir, withIntermediateDirectories: true)
+            let externalImage = outsideDir.appendingPathComponent("external.png")
+            let externalSidecar = outsideDir.appendingPathComponent("external.provenance.json")
+            try png.write(to: externalImage)
+            try Data(#"{"origin":"native"}"#.utf8).write(to: externalSidecar)
+            try fm.createSymbolicLink(at: wallpapers.appendingPathComponent("nature-dawn-link-6k.png"), withDestinationURL: externalImage)
+            try fm.createSymbolicLink(at: wallpapers.appendingPathComponent("nature-dawn-t2-6k.provenance.json"), withDestinationURL: externalSidecar)
             let inUseURL = wallpapers.appendingPathComponent("nature-dawn-t3-6k.png")
             let model = AppModel(desktop: FakeDesktop(), outputRoot: libRoot, preferences: defaults,
                                  isBackgroundWorker: true, inUseWallpaperURLs: { [inUseURL] }, bundleRoot: nil)
             let order = model.wallpapers.map(\.id)
             model.editTags { try $0.addTag(name: "測試", color: "#0A84FF") }
             model.editTags { try $0.set("測試", assigned: true, for: Set(order)) }
-            model.toggleFavorite(model.wallpapers[0])
+            if let first = model.wallpapers.first(where: { $0.id == "nature-dawn-t1-6k.png" }) { model.toggleFavorite(first) }
             let ids = Set(order)
             let summary = model.trash(ids: ids, order: order)
             trashedToClean = summary.trashedURLs
@@ -231,14 +285,21 @@ extension SelfTest {
                 && !fm.fileExists(atPath: originals.appendingPathComponent("nature-dawn-t1.png").path)
                 && !fm.fileExists(atPath: originals.appendingPathComponent("nature-dawn-t2.png").path)
             let inUseKept = fm.fileExists(atPath: inUseURL.path) && fm.fileExists(atPath: originals.appendingPathComponent("nature-dawn-t3.png").path)
-            let inTrash = summary.trashedURLs.count == 6 && summary.trashedURLs.allSatisfy { fm.fileExists(atPath: $0.path) }
+            let inTrash = summary.trashedURLs.count == 5 && summary.trashedURLs.allSatisfy { fm.fileExists(atPath: $0.path) }
                 && summary.trashedURLs.allSatisfy { $0.path.contains("/.Trash") }
             record("移到垃圾桶：主圖、sidecar、原圖都移進垃圾桶（不是永久刪除）",
                    summary.trashed == 2 && goneT1 && inTrash,
                    "移走 \(summary.trashed) 張／\(summary.trashedURLs.count) 個檔")
             record("移到垃圾桶：正在當桌布的略過且留在原地", summary.skippedInUse == 1 && inUseKept, model.statusMessage)
-            let cleanedUp = model.favoriteIDs.isEmpty && model.ids(withTag: "測試") == [inUseURL.lastPathComponent]
-                && model.wallpapers.map(\.id) == [inUseURL.lastPathComponent]
+            let linkName = "nature-dawn-link-6k.png"
+            let linksKept = fm.fileExists(atPath: externalImage.path) && fm.fileExists(atPath: externalSidecar.path)
+                && DeletionPlanner.probe(wallpapers.appendingPathComponent(linkName)) == .symbolicLink
+                && DeletionPlanner.probe(wallpapers.appendingPathComponent("nature-dawn-t2-6k.provenance.json")) == .symbolicLink
+            record("移到垃圾桶：資料夾內指向外部的 symlink（主圖與 sidecar）都略過，外部檔案原地不動",
+                   summary.skippedOther == 1 && linksKept, "略過其他 \(summary.skippedOther) 張")
+            let survivors = [linkName, inUseURL.lastPathComponent]
+            let cleanedUp = model.favoriteIDs.isEmpty && model.ids(withTag: "測試") == Set(survivors)
+                && model.wallpapers.map(\.id) == survivors
                 && model.selection.primary == inUseURL.lastPathComponent
             record("移到垃圾桶：收藏與標籤指派一併移除、reload、選到附近那張", cleanedUp,
                    "剩 \(model.wallpapers.count) 張、主要選取 = \(model.selection.primary ?? "-")")

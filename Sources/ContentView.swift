@@ -92,7 +92,8 @@ struct ContentView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 260, maximum: 440), spacing: 18)]
     /// 浮動操作列的高度＋留白；內容底部要讓出這段距離。
-    private let floatingClearance: CGFloat = 96
+    /// 浮動列高約 52＋離底 18＋留白 24（工單：≥ 浮動列高度＋24），捲到底時最後一列完整露出。
+    private let floatingClearance: CGFloat = 120
     private var isDynamic: Bool { section == .section(.dynamic) }
     private var isFavorites: Bool { section == .section(.favorites) }
     private var isOverview: Bool { section == .section(.all) || section == nil }
@@ -221,14 +222,12 @@ struct ContentView: View {
                 if saved { tagDraft = nil }
             } onCancel: { tagDraft = nil }
         }
-        .alert(trashTitle, isPresented: Binding(get: { pendingTrash != nil }, set: { if !$0 { pendingTrash = nil } })) {
-            Button("移到垃圾桶", role: .destructive) {
+        // 自訂確認視窗：不透明底，文字與按鈕對比足夠（系統 alert 在 macOS 26 會透出背景圖）。
+        .sheet(isPresented: Binding(get: { pendingTrash != nil }, set: { if !$0 { pendingTrash = nil } })) {
+            TrashConfirmSheet(title: trashTitle) {
                 if let ids = pendingTrash { model.trash(ids: ids, order: visibleWallpapers.map(\.id)) }
                 pendingTrash = nil
-            }
-            Button("取消", role: .cancel) { pendingTrash = nil }
-        } message: {
-            Text("原生原圖與來源資訊一起移走，可以從垃圾桶救回。")
+            } onCancel: { pendingTrash = nil }
         }
         .onAppear { installKeyMonitor() }
         .onDisappear { if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }; keyMonitor = nil }
@@ -236,8 +235,9 @@ struct ContentView: View {
         .onChange(of: section) { _, _ in
             search = ""
             if isDynamic { reloadScenes() }
-            if selectedVisible.isEmpty, let first = visibleWallpapers.first { model.selectedID = first.id }
+            syncSelectionToVisible()
         }
+        .onChange(of: search) { _, _ in syncSelectionToVisible() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             displays = DesktopController.snapshots()
         }
@@ -270,7 +270,7 @@ struct ContentView: View {
                 }
                 Section {
                     ForEach(model.tags) { tag in
-                        sidebarRow(.tag(tag.name), title: tag.name, symbol: "", color: WallpaperPalette.hex(string: tag.color),
+                        sidebarRow(.tag(tag.name), title: tag.name, symbol: "", color: WallpaperPalette.muted(tag.color),
                                    count: model.tagCount(tag.name), dot: true)
                             .contextMenu { tagRowMenu(tag) }
                     }
@@ -460,14 +460,15 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     IconTile(symbol: WallpaperPalette.categorySymbol(wallpaper.category),
                              color: WallpaperPalette.categoryColor(wallpaper.category), size: 20)
+                    // 標題 1 行省略（完整名稱在 tooltip），分類藥丸與解析度不被擠。
                     Text(displayTitle(wallpaper))
                         .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(2).truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .layoutPriority(1)
+                        .lineLimit(1).truncationMode(.tail)
+                        .help(displayTitle(wallpaper))
                     Pill(text: categoryTitle(wallpaper.category),
                          color: WallpaperPalette.categoryColor(wallpaper.category), fontSize: 10)
                         .fixedSize()
+                        .layoutPriority(2)
                     Spacer(minLength: 4)
                     if model.favoriteIDs.contains(wallpaper.id) {
                         Image(systemName: "heart.fill")
@@ -479,7 +480,9 @@ struct ContentView: View {
                         .font(.caption).monospacedDigit()
                         .foregroundStyle(WallpaperPalette.secondaryText)
                         .lineLimit(1).fixedSize()
+                        .layoutPriority(2)
                 }
+                .frame(height: 22)
             }
             .padding(10)
             .wallpaperCard(selected: selected)
@@ -516,9 +519,17 @@ struct ContentView: View {
         }
     }
 
-    /// 右鍵在已選取的卡片上 → 對整個選取；否則只對那一張（並改選它）。
+    /// 右鍵在已選取的卡片上 → 對「可見選取」；否則只對那一張。
+    /// 右鍵、浮動列、Delete 都用同一個可見選取集合。
     private func contextTargets(for wallpaper: Wallpaper) -> Set<String> {
-        model.selection.ids.contains(wallpaper.id) ? model.selection.ids : [wallpaper.id]
+        let visibleSelection = Set(selectedVisible.map(\.id))
+        return visibleSelection.contains(wallpaper.id) ? visibleSelection : [wallpaper.id]
+    }
+
+    /// 選取裁成畫面上看得到的；裁完是空的就選第一張可見的。
+    private func syncSelectionToVisible() {
+        model.selection = SelectionLogic.restrict(model.selection, toVisible: visibleWallpapers.map(\.id))
+        if model.selection.ids.isEmpty, let first = visibleWallpapers.first { model.selectedID = first.id }
     }
 
     static func currentModifiers() -> SelectionModifiers {
@@ -732,7 +743,7 @@ struct ContentView: View {
                     .font(.system(size: 13)).monospacedDigit().foregroundStyle(WallpaperPalette.secondaryText)
                     .lineLimit(1)
                 Button("移到垃圾桶") { pendingTrash = Set(picked.map(\.id)) }
-                    .buttonStyle(SecondaryCapsuleStyle(tint: WallpaperPalette.red))
+                    .buttonStyle(DestructiveCapsuleStyle())
                     .help("移到垃圾桶（可以從垃圾桶救回）")
             } else if let wallpaper = inspected {
                 Text("已選 1 張").font(.system(size: 13, weight: .semibold))
@@ -758,7 +769,7 @@ struct ContentView: View {
                 }
             }
             .buttonStyle(PrimaryCapsuleStyle())
-            .disabled(model.isApplying || (isDynamic ? previewedScene?.hasExport != true : (inspected == nil || selectedVisible.count > 1)))
+            .disabled(model.isApplying || (isDynamic ? !(previewedScene.map { DynamicSceneEntry.isComplete($0.directory) } ?? false) : (inspected == nil || selectedVisible.count > 1)))
             .help(!isDynamic && selectedVisible.count > 1 ? L("一次只能設一張") : L("設為桌布"))
         }
         .padding(.leading, 20).padding(.trailing, 7).padding(.vertical, 7)
@@ -833,12 +844,14 @@ struct ContentView: View {
             }
             .overlay(alignment: .bottomLeading) {
                 Text(scene.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1).truncationMode(.tail)
                     .shadow(color: .black.opacity(0.5), radius: 6)
-                    .padding(16)
+                    .padding(.horizontal, 16).padding(.bottom, 14)
+                    .padding(.trailing, 120)
             }
+            .help(scene.title)
             .animation(.easeOut(duration: 0.15), value: phase)
     }
 
@@ -988,6 +1001,7 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             thumbnail(entry.imageURL(.day), radius: 10)
                             Text(entry.title)
+                                .help(entry.title)
                                 .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(2).truncationMode(.tail)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -1080,6 +1094,8 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             if let scene = previewedScene { thumbnail(scene.imageURL(phase), radius: 12) }
                             Text(previewedScene?.title ?? DynamicScene.title).font(.headline).lineLimit(2)
+                                .truncationMode(.tail)
+                                .help(previewedScene?.title ?? DynamicScene.title)
                             Text("\(phase.title) · \(phase.time) 起").font(.caption).monospacedDigit()
                                 .foregroundStyle(WallpaperPalette.secondaryText)
                         }
@@ -1152,7 +1168,7 @@ struct ContentView: View {
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(Capsule().fill(WallpaperPalette.hex(string: tag.color)))
+                    .background(Capsule().fill(WallpaperPalette.muted(tag.color)))
                 }
                 Menu {
                     ForEach(unassigned) { tag in
@@ -1648,5 +1664,40 @@ private struct StatusCardBackground: ViewModifier {
                 .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(color.opacity(0.12)))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(color.opacity(0.3)))
         }
+    }
+}
+
+
+/// 移到垃圾桶的確認視窗：不透明底、紅底白字按鈕；Esc／取消都不刪。
+private struct TrashConfirmSheet: View {
+    let title: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                IconTile(symbol: "trash.fill", color: WallpaperPalette.destructive, size: 40, glass: "favorites")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title).font(.system(size: 15, weight: .semibold))
+                    Text("原生原圖與來源資訊一起移走，可以從垃圾桶救回。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.primary.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                Button("取消") { onCancel() }
+                    .keyboardShortcut(.cancelAction)
+                    .buttonStyle(NeutralSolidCapsuleStyle())
+                Button("移到垃圾桶") { onConfirm() }
+                    .buttonStyle(DestructiveCapsuleStyle())
+            }
+        }
+        .padding(22)
+        .frame(width: 380)
+        .background(WallpaperPalette.panel)
+        .presentationBackground(WallpaperPalette.panel)
     }
 }

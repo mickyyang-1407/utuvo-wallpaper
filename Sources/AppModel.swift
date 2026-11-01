@@ -106,6 +106,7 @@ final class AppModel {
         self.targetDisplayID = (preferences.object(forKey: "rotation.displayID") as? NSNumber)?.uint32Value
         self.rotation.onTick = { [weak self] in self?.rotationTick() }
         reload()
+        if tagStore.isReadOnly && !isBackgroundWorker { errorMessage = TagStore.TagError.readOnly.errorDescription }
         if !isBackgroundWorker { startDailyTimer() }
         refreshAutomationOwnership()
     }
@@ -199,8 +200,7 @@ final class AppModel {
     func deletionPlan(for ids: Set<String>) -> DeletionPlan {
         let targets = wallpapers.filter { ids.contains($0.id) }.map { (id: $0.id, url: $0.url) }
         return DeletionPlanner.plan(targets: targets, dataRoot: outputRoot, bundleRoot: bundleRoot,
-                                    inUse: inUseWallpaperURLs(),
-                                    exists: { FileManager.default.fileExists(atPath: $0.path) })
+                                    inUse: inUseWallpaperURLs())
     }
 
     /// 依計畫移到垃圾桶（實際搬移只在 TrashMover）；刪完清收藏與標籤、reload、選下一張。
@@ -210,6 +210,9 @@ final class AppModel {
         var summary = TrashSummary()
         summary.skippedInUse = plan.skipped.filter { $0.reason == .inUseAsWallpaper }.count
         summary.skippedOther = plan.skipped.count - summary.skippedInUse
+        for file in plan.skippedFiles {
+            LabLog.general.notice("trash: skipped attachment (\(file.reason.rawValue, privacy: .public))")
+        }
         var removed = Set<String>()
         for item in plan.items {
             let outcome = TrashMover.moveToTrash(item.files)
@@ -229,7 +232,7 @@ final class AppModel {
         if selection.ids.isEmpty, let first = wallpapers.first?.id { selectedID = first }
         var parts = [L("已移到垃圾桶 \(summary.trashed) 張")]
         if summary.skippedInUse > 0 { parts.append(L("略過 \(summary.skippedInUse) 張（正在當桌布）")) }
-        if summary.skippedOther > 0 { parts.append(L("略過 \(summary.skippedOther) 張（內建示範或不在資料夾內）")) }
+        if summary.skippedOther > 0 { parts.append(L("略過 \(summary.skippedOther) 張（內建示範、替身捷徑或不在資料夾內）")) }
         if summary.failed > 0 { parts.append(L("\(summary.failed) 張無法移動")) }
         statusMessage = parts.joined(separator: L("，")) + L("。")
         return summary
