@@ -2,7 +2,7 @@
 
 A small native macOS wallpaper app. It generates ten wallpapers in ten different styles every day with your own OpenAI API key, sorts them into categories, rotates them across all your displays, and can turn one scene into a day-to-night wallpaper that follows the time of day.
 
-[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.zip) · [繁體中文](README.zh-Hant.md)
+[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.zip) · [繁體中文](README.zh-Hant.md)
 
 macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 
@@ -20,7 +20,7 @@ New pictures are generated at 3840 × 2160 and saved alongside a 6144 × 3456 ve
 
 ## Install
 
-1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg) and drag **UTUVO Wallpaper** into **Applications**.
+1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg) and drag **UTUVO Wallpaper** into **Applications**.
 2. Open it from Applications. It is signed with a Developer ID and notarized by Apple.
 3. Open **Settings** (⌘,) and paste your OpenAI API key. Without a key you can still browse the demo pictures.
 4. To keep generating and switching with the window closed, turn on the background service in Settings. It only works when the app runs from the Applications folder.

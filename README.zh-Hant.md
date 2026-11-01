@@ -2,7 +2,7 @@
 
 小巧的 macOS 原生桌布 App。用你自己的 OpenAI API key，每天生成 10 張不同風格的桌布，自動分類，在所有螢幕上輪換；也能把一個場景做成跟著時間從清晨變到夜晚的日夜桌布。
 
-[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.zip) · [English](README.md)
+[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.zip) · [English](README.md)
 
 macOS 14 以上 · Apple Silicon 與 Intel · English／繁體中文 · MIT
 
@@ -20,7 +20,7 @@ macOS 14 以上 · Apple Silicon 與 Intel · English／繁體中文 · MIT
 
 ## 安裝
 
-1. [下載 DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.1.0.dmg)，把 **UTUVO Wallpaper** 拖進「應用程式」。
+1. [下載 DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg)，把 **UTUVO Wallpaper** 拖進「應用程式」。
 2. 從「應用程式」打開。已用 Developer ID 簽章並通過 Apple 公證。
 3. 打開**設定**（⌘,），貼上你的 OpenAI API key。沒有 key 也能瀏覽示範圖。
 4. 想關掉視窗後仍每天生成與切換，到設定開啟背景服務；App 必須在「應用程式」資料夾裡才能開。
