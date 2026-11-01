@@ -161,8 +161,9 @@ enum DeletionPlanner {
     ///   - probe: 檔案狀態（注入，測試不必真的建檔）
     static func plan(targets: [(id: String, url: URL)], dataRoot: URL, bundleRoot: URL?,
                      inUse: [URL], probe: (URL) -> FileKind = DeletionPlanner.probe) -> DeletionPlan {
-        let root = canonical(dataRoot).path
-        let bundle = bundleRoot.map { canonical($0).path }
+        // Roots are folders we trust, so resolve them fully (the data folder itself may be an alias).
+        let root = dataRoot.standardizedFileURL.resolvingSymlinksInPath().path
+        let bundle = bundleRoot.map { $0.standardizedFileURL.resolvingSymlinksInPath().path }
         let inUsePaths = Set(inUse.map { $0.standardizedFileURL.resolvingSymlinksInPath().path })
         var plan = DeletionPlan()
         for target in targets {

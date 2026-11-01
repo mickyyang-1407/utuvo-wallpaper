@@ -843,7 +843,7 @@ struct ContentView: View {
                 .padding(14)
             }
             .overlay(alignment: .bottomLeading) {
-                Text(scene.title)
+                Text(DynamicScene.shortTitle(scene.title))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1).truncationMode(.tail)
@@ -1000,7 +1000,7 @@ struct ContentView: View {
                     Button { sceneID = entry.id; previewPhase = nil } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             thumbnail(entry.imageURL(.day), radius: 10)
-                            Text(entry.title)
+                            Text(DynamicScene.shortTitle(entry.title))
                                 .help(entry.title)
                                 .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(2).truncationMode(.tail)
@@ -1093,7 +1093,7 @@ struct ContentView: View {
                         let phase = hoverPhase ?? previewPhase ?? DynamicPhase.current(at: context.date)
                         VStack(alignment: .leading, spacing: 8) {
                             if let scene = previewedScene { thumbnail(scene.imageURL(phase), radius: 12) }
-                            Text(previewedScene?.title ?? DynamicScene.title).font(.headline).lineLimit(2)
+                            Text(DynamicScene.shortTitle(previewedScene?.title ?? DynamicScene.title)).font(.headline).lineLimit(2)
                                 .truncationMode(.tail)
                                 .help(previewedScene?.title ?? DynamicScene.title)
                             Text("\(phase.title) · \(phase.time) 起").font(.caption).monospacedDigit()

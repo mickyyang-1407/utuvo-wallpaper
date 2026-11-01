@@ -187,6 +187,24 @@ extension SelfTest {
                    && linkPlan.skipped.first?.reason == .symbolicLink && linkPlan.skippedFiles.map(\.url) == [sixSidecar],
                "略過 \(linkPlan.skipped.map(\.id))、附屬略過 \(linkPlan.skippedFiles.count) 個")
 
+        let realRoot = tempRoot.appendingPathComponent("plan-real-root", isDirectory: true)
+        let aliasRoot = tempRoot.appendingPathComponent("plan-alias-root", isDirectory: true)
+        try? fm.createDirectory(at: realRoot.appendingPathComponent("wallpapers"), withIntermediateDirectories: true)
+        try? fm.createSymbolicLink(at: aliasRoot, withDestinationURL: realRoot)
+        let aliasImage = aliasRoot.appendingPathComponent("wallpapers/alias-6k.jpg")
+        try? Data([0xFF, 0xD8]).write(to: realRoot.appendingPathComponent("wallpapers/alias-6k.jpg"))
+        let aliasPlan = DeletionPlanner.plan(targets: [("a", aliasImage)], dataRoot: aliasRoot, bundleRoot: nil, inUse: [])
+        record("刪除計畫：資料根目錄本身是 symlink 時，裡面的圖照常列入",
+               aliasPlan.items.map(\.id) == ["a"] && aliasPlan.skipped.isEmpty,
+               "列入 \(aliasPlan.items.map(\.id))、略過 \(aliasPlan.skipped.map { "\($0.id):\($0.reason)" })")
+        try? fm.removeItem(at: aliasRoot)
+        try? fm.removeItem(at: realRoot)
+
+        let shortCases = [("山間湖畔的一間木屋、遠山、樹林與平靜倒影，固定視角", "山間湖畔的一間木屋"),
+                          ("A cabin by a lake, distant peaks", "A cabin by a lake"), ("山稜的一天", "山稜的一天"), ("，開頭", "，開頭")]
+        let shortMiss = shortCases.filter { DynamicScene.shortTitle($0.0) != $0.1 }
+        record("Dynamic：場景短名取第一個分隔符號前的片段", shortMiss.isEmpty, shortMiss.isEmpty ? "\(shortCases.count) 例" : "\(shortMiss)")
+
         // MARK: Dynamic 時間軸與場景庫
         let segments = DynamicPhase.timelineSegments
         let contiguous = zip(segments, segments.dropFirst()).allSatisfy { $0.end == $1.start }

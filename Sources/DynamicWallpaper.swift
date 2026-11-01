@@ -73,6 +73,15 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
 /// One original scene, four aligned lighting variants. No network or credentials.
 enum DynamicScene {
     static var title: String { GeneratedScene.load()?.prompt ?? L("山稜的一天") }
+
+    /// Scene descriptions are full prompts; show the first clause as the name and keep the rest in tooltips.
+    static func shortTitle(_ prompt: String) -> String {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separators: Set<Character> = ["，", "、", "；", "。", ",", ";", "."]
+        guard let cut = trimmed.firstIndex(where: { separators.contains($0) }) else { return trimmed }
+        let head = String(trimmed[..<cut]).trimmingCharacters(in: .whitespaces)
+        return head.isEmpty ? trimmed : head
+    }
     static var directory: URL {
         if let scene = GeneratedScene.load() { return scene.directory }
         return builtInDirectory
