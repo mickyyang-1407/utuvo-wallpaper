@@ -38,6 +38,28 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
         case .night: return "moon.stars"
         }
     }
+    /// 結束時刻（下一個時段的開始）。
+    var endHour: Int {
+        switch self {
+        case .dawn: return 9
+        case .day: return 18
+        case .dusk: return 21
+        case .night: return 6
+        }
+    }
+    var range: String { String(format: "%02d:00–%02d:00", startHour, endHour) }
+
+    /// 24 小時時間軸的色段（小時，0–24）。夜晚跨午夜拆成頭尾兩段。
+    static var timelineSegments: [(phase: DynamicPhase, start: Int, end: Int)] {
+        [(.night, 0, 6), (.dawn, 6, 9), (.day, 9, 18), (.dusk, 18, 21), (.night, 21, 24)]
+    }
+
+    /// 一天中的位置（0…1），給「現在」指示線。
+    static func dayFraction(at date: Date, calendar: Calendar = .current) -> Double {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return Double((parts.hour ?? 0) * 60 + (parts.minute ?? 0)) / 1440
+    }
+
     static func current(at date: Date) -> Self {
         switch Calendar.current.component(.hour, from: date) {
         case 6..<9: return .dawn
@@ -51,8 +73,21 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
 /// One original scene, four aligned lighting variants. No network or credentials.
 enum DynamicScene {
     static var title: String { GeneratedScene.load()?.prompt ?? L("山稜的一天") }
+
+    /// Scene descriptions are full prompts; show the first clause as the name and keep the rest in tooltips.
+    static func shortTitle(_ prompt: String) -> String {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separators: Set<Character> = ["，", "、", "；", "。", ",", ";", "."]
+        guard let cut = trimmed.firstIndex(where: { separators.contains($0) }) else { return trimmed }
+        let head = String(trimmed[..<cut]).trimmingCharacters(in: .whitespaces)
+        return head.isEmpty ? trimmed : head
+    }
     static var directory: URL {
         if let scene = GeneratedScene.load() { return scene.directory }
+        return builtInDirectory
+    }
+    /// 內建示範「山稜的一天」所在位置（資料夾 → App 旁 → bundle 示範，取第一個四張都在的）。
+    static var builtInDirectory: URL {
         let relative = "dynamic/mountain-hours"
         var candidates = [LabPaths.deliveryRoot.appendingPathComponent(relative, isDirectory: true)]
         if let adjacent = LabPaths.adjacentDataRoot { candidates.append(adjacent.appendingPathComponent(relative, isDirectory: true)) }
@@ -149,5 +184,55 @@ enum DynamicScene {
     struct SceneError: LocalizedError {
         let message: String
         var errorDescription: String? { message }
+    }
+}
+
+/// 場景庫的一個場景：四張都在才算完整。
+struct DynamicSceneEntry: Identifiable, Hashable {
+    let directory: URL
+    let title: String
+    let created: Date?
+    let isBuiltIn: Bool
+    var id: String { directory.standardizedFileURL.path }
+
+    func imageURL(_ phase: DynamicPhase) -> URL { directory.appendingPathComponent(phase.rawValue + ".jpg") }
+    var heicURL: URL { directory.appendingPathComponent("mountain-hours.heic") }
+    var hasExport: Bool { FileManager.default.fileExists(atPath: heicURL.path) }
+    var resolution: String {
+        guard let data = try? Data(contentsOf: imageURL(.day)), let size = ImageResampler.pixelSize(of: data) else { return L("尚無圖片") }
+        return "\(Int(size.width)) × \(Int(size.height))"
+    }
+
+    static func isComplete(_ directory: URL) -> Bool {
+        DynamicPhase.allCases.allSatisfy {
+            FileManager.default.fileExists(atPath: directory.appendingPathComponent($0.rawValue + ".jpg").path)
+        }
+    }
+}
+
+enum DynamicSceneLibrary {
+    /// `dynamic/scenes/` 底下所有完整場景（新的在前），加上內建示範「山稜的一天」（若存在）。
+    static func load(root: URL = LabPaths.deliveryRoot, builtIn: URL? = DynamicScene.builtInDirectory) -> [DynamicSceneEntry] {
+        let fm = FileManager.default
+        let scenesDir = root.appendingPathComponent("dynamic/scenes", isDirectory: true)
+        let folders = (try? fm.contentsOfDirectory(at: scenesDir, includingPropertiesForKeys: [.creationDateKey, .isDirectoryKey],
+                                                    options: [.skipsHiddenFiles])) ?? []
+        var entries: [DynamicSceneEntry] = folders.compactMap { folder in
+            guard (try? folder.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+                  DynamicSceneEntry.isComplete(folder) else { return nil }
+            var prompt: String?
+            if let data = try? Data(contentsOf: folder.appendingPathComponent("scene.json")),
+               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                prompt = object["prompt"] as? String
+            }
+            let created = (try? folder.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+            return DynamicSceneEntry(directory: folder, title: prompt ?? folder.lastPathComponent, created: created, isBuiltIn: false)
+        }
+        entries.sort { ($0.created ?? .distantPast) > ($1.created ?? .distantPast) }
+        if let builtIn, DynamicSceneEntry.isComplete(builtIn) {
+            let created = (try? builtIn.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+            entries.append(DynamicSceneEntry(directory: builtIn, title: L("山稜的一天"), created: created, isBuiltIn: true))
+        }
+        return entries
     }
 }

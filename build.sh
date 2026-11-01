@@ -68,6 +68,11 @@ PLIST
 
 cp "$ROOT/Assets/AppIcon.icns" "$RES_DIR/AppIcon.icns"
 cp -R "$ROOT/Assets/Demo" "$RES_DIR/Demo"
+# Blender 玻璃圖示方塊（tools/blender/glass_tiles.py 產生）：只帶縮小版，1024px 主檔留在原始碼。
+if [ -d "$ROOT/Assets/GlassTiles" ]; then
+    mkdir -p "$RES_DIR/GlassTiles"
+    find "$ROOT/Assets/GlassTiles" -maxdepth 1 -name '*-[0-9]*.png' -exec cp {} "$RES_DIR/GlassTiles/" \;
+fi
 # 介面語言跟系統：繁中＝原文，其他語言＝英文（Localization/check.py 檢查缺翻譯）。
 cp -R "$ROOT/Localization/en.lproj" "$ROOT/Localization/zh-Hant.lproj" "$RES_DIR/"
 

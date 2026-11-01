@@ -21,6 +21,40 @@ enum WallpaperPalette {
     static let green = hex(0x30D158)
     static let orange = hex(0xFF9F0A)
     static let blue = hex(0x0A84FF)
+    static let red = hex(0xFF453A)
+    /// 破壞性按鈕底色（白字對比 ≥ 4.5:1）。
+    static let destructive = hex(0xC42B2B)
+
+    /// 標籤色顯示用：飽和度降約 22%，不搶桌布（存檔的色碼不變）。
+    static func muted(_ string: String) -> Color {
+        let trimmed = string.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
+        guard trimmed.count == 6, let value = UInt32(trimmed, radix: 16) else { return hex(0x8E8E93) }
+        let color = NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+                            blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+        var h: CGFloat = 0, sat: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getHue(&h, saturation: &sat, brightness: &b, alpha: &a)
+        return Color(nsColor: NSColor(hue: h, saturation: sat * 0.78, brightness: b * 0.94, alpha: 1))
+    }
+
+    /// 解析度級距對應的玻璃方塊（同色）。
+    static func resolutionGlass(_ tier: ResolutionTier) -> String {
+        switch tier {
+        case .sixK: return "all"
+        case .fiveK: return "cosmic"
+        case .fourK: return "watercolor"
+        case .other: return "other"
+        }
+    }
+
+    /// 解析度級距的圖示色。
+    static func resolutionColor(_ tier: ResolutionTier) -> Color {
+        switch tier {
+        case .sixK: return hex(0x0A84FF)
+        case .fiveK: return hex(0x5E5CE6)
+        case .fourK: return hex(0x40C8E0)
+        case .other: return hex(0x636366)
+        }
+    }
 
     static func hex(_ rgb: UInt32) -> Color {
         Color(.sRGB,
@@ -28,6 +62,13 @@ enum WallpaperPalette {
               green: Double((rgb >> 8) & 255) / 255,
               blue: Double(rgb & 255) / 255,
               opacity: 1)
+    }
+
+    /// "#RRGGBB" → Color；格式不對時退回中性灰。
+    static func hex(string: String) -> Color {
+        let trimmed = string.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
+        guard trimmed.count == 6, let value = UInt32(trimmed, radix: 16) else { return hex(0x8E8E93) }
+        return hex(value)
     }
 
     static func surface(light: UInt32, dark: UInt32) -> Color {
@@ -89,13 +130,41 @@ struct CanvasBackground: View {
     }
 }
 
-/// 彩色圓角圖示方塊：漸層填色＋白色 SF Symbol。
+/// 彩色圓角圖示方塊：Blender 玻璃方塊 PNG 當底＋白色 SF Symbol；找不到圖就退回漸層色塊。
 struct IconTile: View {
     let symbol: String
     let color: Color
     var size: CGFloat = 24
+    /// 玻璃方塊名稱（Assets/GlassTiles/<名稱>）；nil＝依符號推斷。
+    var glass: String? = nil
+
+    /// STYLE.md 的符號 → 方塊顏色名稱。
+    static let glassBySymbol: [String: String] = [
+        "photo.on.rectangle": "all", "heart.fill": "favorites", "sun.max.fill": "dynamic",
+        "leaf.fill": "nature", "square": "minimal", "scribble.variable": "abstract",
+        "paintbrush.pointed.fill": "illustration", "sparkles": "cosmic", "paintpalette.fill": "watercolor",
+        "building.columns.fill": "architecture", "film.fill": "animation", "photo": "other",
+        "gearshape.fill": "settings",
+    ]
 
     var body: some View {
+        if let image = GlassTileImages.image(glass ?? Self.glassBySymbol[symbol], points: size) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+                .overlay(
+                    Image(systemName: symbol)
+                        .font(.system(size: size * 0.48, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.22), radius: size * 0.04, y: size * 0.02))
+                .accessibilityHidden(true)
+        } else {
+            gradientTile
+        }
+    }
+
+    private var gradientTile: some View {
         RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
             .fill(LinearGradient(colors: [color.opacity(0.88), color],
                                  startPoint: .top, endPoint: .bottom))
@@ -108,6 +177,23 @@ struct IconTile: View {
                     .foregroundStyle(.white))
             .frame(width: size, height: size)
             .accessibilityHidden(true)
+    }
+}
+
+/// 讀 bundle 裡的玻璃方塊（依顯示大小挑 48／72／96px），讀過就快取。
+enum GlassTileImages {
+    nonisolated(unsafe) private static var cache: [String: NSImage] = [:]
+
+    static func image(_ name: String?, points: CGFloat) -> NSImage? {
+        guard let name else { return nil }
+        let pixels = points * 2
+        let size = [48, 72, 96].first { CGFloat($0) >= pixels } ?? 96
+        let key = "\(name)-\(size)"
+        if let hit = cache[key] { return hit }
+        guard let url = Bundle.main.resourceURL?.appendingPathComponent("GlassTiles/\(key).png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        cache[key] = image
+        return image
     }
 }
 
@@ -164,26 +250,71 @@ struct PrimaryCapsuleStyle: ButtonStyle {
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
-            .background(
-                Capsule().fill(LinearGradient(colors: [WallpaperPalette.accent, WallpaperPalette.accentDeep],
-                                              startPoint: .top, endPoint: .bottom)))
+            .modifier(PrimaryCapsuleBackground())
             .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
             .contentShape(Capsule())
+    }
+}
+
+/// 主要按鈕底：macOS 26 是藍色染色的互動玻璃，舊系統是藍色漸層膠囊。
+private struct PrimaryCapsuleBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            // 保留品牌藍（STYLE.md），玻璃負責邊緣高光與按壓回饋。
+            content
+                .background(Capsule().fill(LinearGradient(colors: [WallpaperPalette.accent, WallpaperPalette.accentDeep],
+                                                          startPoint: .top, endPoint: .bottom)))
+                .glassEffect(.clear.interactive(), in: Capsule())
+        } else {
+            content.background(
+                Capsule().fill(LinearGradient(colors: [WallpaperPalette.accent, WallpaperPalette.accentDeep],
+                                              startPoint: .top, endPoint: .bottom)))
+        }
     }
 }
 
 /// 次要膠囊按鈕（狀態卡的「查看」）。
 struct SecondaryCapsuleStyle: ButtonStyle {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.isEnabled) private var isEnabled
+    /// 有色次要按鈕（例：紅色「移到垃圾桶」）：字用該色、底用該色淡底。
+    var tint: Color?
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(tint ?? Color.primary)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(Capsule().fill(scheme == .dark ? Color.white.opacity(configuration.isPressed ? 0.16 : 0.1)
-                                       : Color.black.opacity(configuration.isPressed ? 0.1 : 0.06)))
+            .modifier(SecondaryCapsuleBackground(fill: background(pressed: configuration.isPressed), tint: tint))
+            .opacity(isEnabled ? 1 : 0.45)
             .contentShape(Capsule())
+    }
+
+    private func background(pressed: Bool) -> Color {
+        if let tint { return tint.opacity(pressed ? 0.26 : 0.16) }
+        return scheme == .dark ? Color.white.opacity(pressed ? 0.16 : 0.1) : Color.black.opacity(pressed ? 0.1 : 0.06)
+    }
+}
+
+/// 次要按鈕底：macOS 26 是（可染色的）互動玻璃，舊系統是淡色膠囊。
+private struct SecondaryCapsuleBackground: ViewModifier {
+    var fill: Color
+    var tint: Color?
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            if let tint {
+                // 有色按鈕：先鋪實的淡色底（對比夠），玻璃只給高光與按壓回饋。
+                content
+                    .background(Capsule().fill(tint.opacity(0.2)))
+                    .glassEffect(.clear.interactive(), in: Capsule())
+            } else {
+                content.glassEffect(.regular.interactive(), in: Capsule())
+            }
+        } else {
+            content.background(Capsule().fill(fill))
+        }
     }
 }
 
@@ -205,5 +336,59 @@ struct StripeFill: View {
             }
             context.stroke(path, with: .color(color.opacity(0.75)), lineWidth: lineWidth)
         }
+    }
+}
+
+/// 玻璃容器（時間軸、分布長條、狀態卡等）。舊系統退回卡片外觀。
+struct GlassPanel: ViewModifier {
+    var radius: CGFloat = 16
+    var tint: Color?
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.glassEffect(tint.map { Glass.regular.tint($0) } ?? .regular,
+                                in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        } else {
+            content.wallpaperCard(radius: radius)
+        }
+    }
+}
+
+extension View {
+    func glassPanel(radius: CGFloat = 16, tint: Color? = nil) -> some View {
+        modifier(GlassPanel(radius: radius, tint: tint))
+    }
+}
+
+
+/// 紅底白字的破壞性膠囊按鈕（不用玻璃，確保對比）。
+struct DestructiveCapsuleStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(WallpaperPalette.destructive.opacity(configuration.isPressed ? 0.85 : 1)))
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(Capsule())
+    }
+}
+
+/// 不透明中性膠囊按鈕（確認視窗的「取消」）。
+struct NeutralSolidCapsuleStyle: ButtonStyle {
+    @Environment(\.colorScheme) private var scheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(scheme == .dark ? Color.white.opacity(configuration.isPressed ? 0.2 : 0.14)
+                                                         : Color.black.opacity(configuration.isPressed ? 0.12 : 0.07)))
+            .contentShape(Capsule())
     }
 }
