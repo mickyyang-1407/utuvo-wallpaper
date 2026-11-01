@@ -84,7 +84,9 @@ struct Coordinate: Equatable, Sendable {
 enum SolarCalculator {
     static func sunriseSunset(on date: Date, at coordinate: Coordinate, calendar: Calendar = .current) -> (sunrise: Int, sunset: Int)? {
         let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
-        let offsetMinutes = Double(calendar.timeZone.secondsFromGMT(for: date)) / 60
+        // 用當天中午的時差：日光節約通常在凌晨切換，午夜的時差會是切換前的。
+        let localNoon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: date) ?? date
+        let offsetMinutes = Double(calendar.timeZone.secondsFromGMT(for: localNoon)) / 60
         let gamma = 2 * Double.pi / 365 * Double(dayOfYear - 1)
         let eqTime = 229.18 * (0.000075 + 0.001868 * cos(gamma) - 0.032077 * sin(gamma)
                                - 0.014615 * cos(2 * gamma) - 0.040849 * sin(2 * gamma))

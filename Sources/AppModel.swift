@@ -352,17 +352,19 @@ final class AppModel {
         }
         let connected = Set(desktop.displayIDs())
         let perDisplay = pairs.compactMap { display, wallpaper in display.flatMap { connected.contains($0) ? ($0, wallpaper) : nil } }
-        let ok: Bool
+        // 實際套上去的圖（舊螢幕全部不在時，只把第一張套到目前螢幕）。
+        let applied: [Wallpaper]
         if pairs.first?.0 != nil, !perDisplay.isEmpty {
-            ok = await applyPerDisplay(perDisplay, recordHistory: false)
+            guard await applyPerDisplay(perDisplay, recordHistory: false) else { return }
+            applied = perDisplay.map(\.1)
         } else if let wallpaper = pairs.first?.1 {
-            ok = await apply(wallpaper, recordHistory: false)
+            guard await applyUnlocked(wallpaper, recordHistory: false) else { return }
+            applied = [wallpaper]
         } else { return }
-        guard ok else { return }
         preferences.set(target.remaining, forKey: "rotation.history")
         preferences.set(date, forKey: "rotation.lastAttempt")
-        preferences.set(pairs.last?.1.id, forKey: "rotation.lastID")
-        selectedID = pairs.first?.1.id
+        preferences.set(applied.last?.id, forKey: "rotation.lastID")
+        selectedID = applied.first?.id
     }
 
     /// 收藏／取消收藏主螢幕目前的桌布。回傳是否找到那張。
@@ -405,7 +407,7 @@ final class AppModel {
             }
             ok = await applyPerDisplay(assignments)
         } else {
-            ok = await apply(firstWallpaper)
+            ok = await applyUnlocked(firstWallpaper)
         }
         guard ok else { return .failed }
         preferences.set(picks.last, forKey: "rotation.lastID")
@@ -491,8 +493,18 @@ final class AppModel {
     /// 成功與否以「讀回相符」為準：
     /// - 沒有任何螢幕 → 失敗（不能顯示成功）。
     /// - 設定成功但讀回不符 → 算失敗（不能顯示成功卻讀回 0 顆）。
+    /// 對外的套用：先拿跨行程的換桌布鎖，跟背景 worker、選單列互斥。
     @discardableResult
     func apply(_ wallpaper: Wallpaper, preserveDynamic: Bool = false, recordHistory: Bool = true) async -> Bool {
+        guard !isApplying, let lease = try? FileLease.acquire(at: desktopLockURL) else {
+            statusMessage = L("正在換桌布，請稍後再試。"); return false
+        }
+        defer { withExtendedLifetime(lease) {} }
+        return await applyUnlocked(wallpaper, preserveDynamic: preserveDynamic, recordHistory: recordHistory)
+    }
+
+    /// 呼叫端已持有換桌布鎖。
+    private func applyUnlocked(_ wallpaper: Wallpaper, preserveDynamic: Bool = false, recordHistory: Bool = true) async -> Bool {
         guard !isApplying else { return false }
         isApplying = true
         defer { isApplying = false }

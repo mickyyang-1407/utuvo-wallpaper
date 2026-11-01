@@ -256,6 +256,13 @@ extension SelfTest {
             $0.phase == .dawn && taipei.component(.day, from: $0.at) == 22 } ?? false
         let polar = DynamicSchedule(timing: .solar, coordinate: Coordinate(latitude: 78.2, longitude: 15.6))
             .starts(on: day(london, 2026, 6, 21), calendar: london) == DynamicSchedule.fixedStarts
+        var newYork = Calendar(identifier: .gregorian); newYork.timeZone = TimeZone(identifier: "America/New_York")!
+        let nyc = Coordinate(latitude: 40.71, longitude: -74.01)
+        // 2026-03-08 凌晨 2 點起改夏令時間；日出約 07:1x（夏令），不能用午夜的冬令時差算成 06:1x。
+        let dstMidnight = SolarCalculator.sunriseSunset(on: newYork.startOfDay(for: day(newYork, 2026, 3, 8)), at: nyc, calendar: newYork)
+        let dstOK = dstMidnight.map { (7 * 60)...(7 * 60 + 30) ~= $0.sunrise } ?? false
+        record("日出日落：日光節約切換當天用當天時差（紐約 2026-03-08）", dstOK,
+               dstMidnight.map { "日出 \(DynamicSchedule.clock($0.sunrise))" } ?? "nil")
         let appearance = DynamicSchedule(timing: .appearance, coordinate: tpe)
         let appearanceOK = appearance.phase(at: Date(), isDark: true) == .night && appearance.phase(at: Date(), isDark: false) == .day
             && appearance.segments(on: Date()).isEmpty && appearance.next(after: Date()) == nil

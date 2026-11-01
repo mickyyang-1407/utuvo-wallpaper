@@ -513,6 +513,7 @@ enum SelfTest {
             let decoded = RotationPlan.decode(pairEntry)
             let pairOK = decoded.count == 2 && decoded[0].0 == 11 && decoded[0].1 == "a;b=c.jpg" && decoded[1].0 == 22
                 && RotationPlan.decode("x.jpg").first?.0 == nil
+                && RotationPlan.decode("@22\u{1F}foo.jpg").first.map { $0.0 == nil && $0.1 == "@22\u{1F}foo.jpg" } == true
                 && RotationPlan.previous(in: [pairEntry, "x.jpg"], existing: ["a;b=c.jpg", "x.jpg"]) == nil
                 && RotationPlan.previous(in: [pairEntry, "x.jpg"], existing: ["a;b=c.jpg", "d.jpg", "x.jpg"])?.entry == pairEntry
             let urlCases: [(String, WallpaperCommand?)] = [
@@ -582,8 +583,25 @@ enum SelfTest {
             let countBeforeBusy = multiDesktop.appliedURLs.count
             await multiModel.skipToNext(at: t0.addingTimeInterval(970))
             let busySkipped = multiDesktop.appliedURLs.count == countBeforeBusy
+            let directApplyBlocked = await multiModel.apply(multiModel.wallpapers[0]) == false
             held = nil  // 放掉鎖，後面的案例才能換桌布
-            record("另一方正在換桌布時（GUI／背景互斥）不動作", lockTaken && busySkipped, "持有 .desktop-apply.lock")
+            record("另一方正在換桌布時（GUI／背景互斥）不動作：下一張與直接設為桌布都會等", lockTaken && busySkipped && directApplyBlocked,
+                   "持有 .desktop-apply.lock")
+
+            // 舊紀錄的螢幕全部不在：只把第一張套到目前螢幕，游標也停在那一張
+            multiDesktop.displays = [11, 22]
+            multiModel.rotationPerDisplay = true
+            await multiModel.skipToNext(at: t0.addingTimeInterval(975))
+            let oldSet = Array(multiDesktop.perDisplay.suffix(2)).map(\.1)
+            await multiModel.skipToNext(at: t0.addingTimeInterval(976))
+            multiDesktop.displays = [44]
+            await multiModel.applyPrevious(at: t0.addingTimeInterval(977))
+            let cursorAfter = testDefaults.string(forKey: "rotation.lastID")
+            record("上一張：舊螢幕都不在時套第一張，游標也指向那一張",
+                   cursorAfter == oldSet.first && multiDesktop.perDisplay.last?.0 == nil && multiDesktop.perDisplay.last?.1 == oldSet.first,
+                   "舊組合 \(oldSet)、游標 \(cursorAfter ?? "nil")")
+            multiDesktop.displays = [11, 22, 33]
+            multiModel.rotationPerDisplay = false
 
             multiModel.rotationPerDisplay = false
             await multiModel.skipToNext(at: t0.addingTimeInterval(999))

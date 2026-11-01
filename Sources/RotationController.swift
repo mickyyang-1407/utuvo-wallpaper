@@ -126,6 +126,7 @@ final class DailyScheduler {
 /// 輪換挑圖與「上一張」的純函式，方便自我測試。
 enum RotationPlan {
     static let historyLimit = 30
+    private static let perDisplayMark = "\u{1D}"
 
     /// 從游標的下一張開始挑 `count` 張；圖池比螢幕少時會重複。游標不在圖池裡就從頭。
     static func next(pool: [String], after cursor: String?, count: Int) -> [String] {
@@ -135,14 +136,14 @@ enum RotationPlan {
     }
 
     /// 一筆歷史：一張（所有螢幕／指定螢幕同一張）或「每顆螢幕各一張」。
-    /// 每螢幕紀錄以 `@` 開頭，螢幕與圖片用控制字元分隔，不會跟檔名撞。
+    /// 每螢幕紀錄以控制字元 U+001D 開頭，螢幕與圖片也用控制字元分隔；檔名不會用到這些字元。
     static func entry(_ id: String) -> String { id }
     static func entry(perDisplay pairs: [(UInt32, String)]) -> String {
-        "@" + pairs.map { "\($0.0)\u{1F}\($0.1)" }.joined(separator: "\u{1E}")
+        perDisplayMark + pairs.map { "\($0.0)\u{1F}\($0.1)" }.joined(separator: "\u{1E}")
     }
     /// 解回 (螢幕, 圖片)；螢幕 nil＝套用到目前選的螢幕。
     static func decode(_ entry: String) -> [(UInt32?, String)] {
-        guard entry.hasPrefix("@") else { return [(nil, entry)] }
+        guard entry.hasPrefix(perDisplayMark) else { return [(nil, entry)] }
         return entry.dropFirst().split(separator: "\u{1E}").compactMap { pair in
             let parts = pair.split(separator: "\u{1F}", maxSplits: 1)
             guard parts.count == 2, let display = UInt32(parts[0]) else { return nil }
