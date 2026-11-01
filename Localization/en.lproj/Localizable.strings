@@ -247,3 +247,33 @@
 "顯示檢視器" = "Show Inspector";
 "黃昏" = "Dusk";
 "（系統預設）" = "(System default)";
+
+/* 0002 介面改版 */
+"%@ · %lld 張" = "%@ · %lld pictures";
+"%lld 個分類" = "%lld categories";
+"UTUVO Wallpaper 為你準備了" = "UTUVO Wallpaper has";
+"下次切換 %@ %@" = "next switch at %@ (%@)";
+"今天新增 %lld 張" = "%lld new today";
+"實心是今天新的，斜線是之前的。點一段可打開該分類。" = "Solid is new today, striped is from before. Click a block to open that category.";
+"尚未選取桌布" = "No wallpaper selected";
+"已收藏" = "Favorite";
+"已選 1 張" = "1 selected";
+"日夜桌布" = "Day & Night wallpaper";
+"日夜模式已啟用" = "Day & Night mode is on";
+"查看" = "View";
+"正在產生桌布" = "Generating wallpapers";
+"每天自動產生一批新桌布，使用 API 額度。" = "A new batch is generated every day using your API credits.";
+"每日生成：%@" = "Daily generation: %@";
+"現在是%@，%@ 換%@。" = "It's %@ now; at %@ it changes to %@.";
+"目前不會自動產生新桌布。可在「輪換與每日生成」開啟。" = "New wallpapers aren't generated automatically. Turn it on in Rotation & Daily Generation.";
+"請稍候…" = "Please wait…";
+"需要注意" = "Needs attention";
+"紙上遠山" = "Paper Mountains";
+"流動光帶" = "Flowing Ribbons";
+"黃昏街角" = "Dusk Street Corner";
+"星雲深處" = "Deep Nebula";
+"葉脈微距" = "Leaf Vein Macro";
+"田園午後" = "Meadow Afternoon";
+"沙色拱廊" = "Sand Arcade";
+"海邊車站" = "Seaside Station";
+"潮汐漸層" = "Tidal Gradient";
