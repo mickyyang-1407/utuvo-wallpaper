@@ -68,7 +68,8 @@ struct ContentView: View {
     @State private var scenePrompt = L("山間湖畔的一間木屋、遠山、樹林與平靜倒影，固定視角，溫暖寫實攝影")
     @State private var previewPhase: DynamicPhase?
     @State private var displays = DesktopController.snapshots()
-    @State private var titles = WallpaperTitleCache()
+    /// 顯示名稱與建立日期：圖庫清單改變時才算一次，render 期間只查表。
+    @State private var index = WallpaperIndex()
     @Environment(\.colorScheme) private var colorScheme
 
     private let columns = [GridItem(.adaptive(minimum: 260, maximum: 440), spacing: 18)]
@@ -95,8 +96,7 @@ struct ContentView: View {
         }
         guard newestFirst else { return result }
         let dated: [(wallpaper: Wallpaper, date: Date)] = result.map { item in
-            let values = try? item.url.resourceValues(forKeys: [.creationDateKey])
-            return (item, values?.creationDate ?? Date.distantPast)
+            (item, index.created[item.id] ?? Date.distantPast)
         }
         return dated.sorted { left, right in
             left.date == right.date ? left.wallpaper.name < right.wallpaper.name : left.date > right.date
@@ -157,6 +157,9 @@ struct ContentView: View {
             .inspectorColumnWidth(min: 270, ideal: 290, max: 340)
         }
         .id(model.dynamicRevision)
+        .onChange(of: model.wallpapers.map(\.id), initial: true) { _, _ in
+            index = WallpaperIndex(library: model.wallpapers)
+        }
         .navigationSplitViewStyle(.balanced)
         .tint(WallpaperPalette.accent)
         .accentColor(WallpaperPalette.accent)
@@ -267,9 +270,7 @@ struct ContentView: View {
     private func isAddedToday(_ wallpaper: Wallpaper, now: Date) -> Bool {
         let today = Self.dayFormatter.string(from: now)
         if wallpaper.name.contains("daily-\(today)") { return true }
-        guard let created = (try? wallpaper.url.resourceValues(forKeys: [.creationDateKey]))?.creationDate else {
-            return false
-        }
+        guard let created = index.created[wallpaper.id] else { return false }
         return Calendar.current.isDate(created, inSameDayAs: now)
     }
 
@@ -426,14 +427,24 @@ struct ContentView: View {
         }
     }
 
-    private func distributionBar(_ shares: [CategoryShare]) -> some View {
-        let total = max(shares.reduce(0) { $0 + $1.total }, 1)
+    /// 各段寬度：先依張數比例、套最小寬，再整體等比縮放，總寬恰好等於可用寬度、不溢出。
+    static func segmentWidths(_ counts: [Int], available: CGFloat, minimum: CGFloat = 10) -> [CGFloat] {
+        let total = counts.reduce(0, +)
+        guard total > 0, available > 0 else { return counts.map { _ in 0 } }
+        let floored = counts.map { max(available * CGFloat($0) / CGFloat(total), minimum) }
+        let scale = available / floored.reduce(0, +)
+        return floored.map { $0 * scale }
+    }
+
+    private func distributionBar(_ allShares: [CategoryShare]) -> some View {
+        let shares = allShares.filter { $0.total > 0 }
         let gap: CGFloat = 6
         return GeometryReader { geometry in
-            let available = geometry.size.width - gap * CGFloat(max(shares.count - 1, 0))
+            let available = max(geometry.size.width - gap * CGFloat(max(shares.count - 1, 0)), 0)
+            let widths = Self.segmentWidths(shares.map(\.total), available: available)
             HStack(spacing: gap) {
-                ForEach(shares) { share in
-                    let width = max(available * CGFloat(share.total) / CGFloat(total), 10)
+                ForEach(Array(shares.enumerated()), id: \.element.id) { offset, share in
+                    let width = widths[offset]
                     let solid = share.total > 0 ? width * CGFloat(share.today) / CGFloat(share.total) : 0
                     let color = WallpaperPalette.categoryColor(share.name)
                     Button { section = .category(share.name) } label: {
@@ -839,7 +850,7 @@ struct ContentView: View {
     }
 
     private func displayTitle(_ wallpaper: Wallpaper) -> String {
-        titles.title(for: wallpaper, in: model.wallpapers)
+        index.titles[wallpaper.id] ?? wallpaper.url.deletingPathExtension().lastPathComponent
     }
 
     private func exportDynamic() {
@@ -888,10 +899,11 @@ private func legacyDisplayTitle(_ fileName: String) -> String? {
     }
 }
 
-/// 依圖庫內容算一次所有顯示名稱：範本標題 · 日期；同範本同日重複再加序號。
-final class WallpaperTitleCache {
-    private var signature: [String] = []
-    private var cache: [String: String] = [:]
+/// 依圖庫內容算一次所有顯示名稱與建立日期：範本標題 · 日期；同範本同日重複再加序號。
+/// 只在圖庫 id 清單改變時重建（每個檔案只讀一次建立日期），畫面重繪時只查表。
+struct WallpaperIndex {
+    private(set) var titles: [String: String] = [:]
+    private(set) var created: [String: Date] = [:]
 
     private static let dayParser: DateFormatter = {
         let formatter = DateFormatter()
@@ -901,7 +913,7 @@ final class WallpaperTitleCache {
         return formatter
     }()
 
-    private static var dayFormatter: DateFormatter {
+    private static func dayFormatter() -> DateFormatter {
         let language = Bundle.main.preferredLocalizations.first ?? "en"
         let formatter = DateFormatter()
         if language.hasPrefix("zh") {
@@ -913,28 +925,31 @@ final class WallpaperTitleCache {
         return formatter
     }
 
-    func title(for wallpaper: Wallpaper, in library: [Wallpaper]) -> String {
-        let ids = library.map(\.id)
-        if ids != signature { rebuild(library); signature = ids }
-        return cache[wallpaper.id] ?? Self.baseTitle(for: wallpaper, formatter: Self.dayFormatter)
-    }
+    init() {}
 
-    private func rebuild(_ library: [Wallpaper]) {
-        let formatter = Self.dayFormatter
-        let bases = library.sorted { $0.name < $1.name }.map { ($0.id, Self.baseTitle(for: $0, formatter: formatter)) }
-        var seen: [String: Int] = [:]
-        let totals = Dictionary(grouping: bases, by: { $0.1 }).mapValues(\.count)
-        var result: [String: String] = [:]
-        for (id, base) in bases {
-            guard totals[base, default: 0] > 1 else { result[id] = base; continue }
-            let index = seen[base, default: 0] + 1
-            seen[base] = index
-            result[id] = "\(base) · \(index)"
+    init(library: [Wallpaper]) {
+        let formatter = Self.dayFormatter()
+        var created: [String: Date] = [:]
+        for wallpaper in library {
+            created[wallpaper.id] = (try? wallpaper.url.resourceValues(forKeys: [.creationDateKey]))?.creationDate
         }
-        cache = result
+        let bases = library.sorted { $0.name < $1.name }.map {
+            ($0.id, Self.baseTitle(for: $0, created: created[$0.id], formatter: formatter))
+        }
+        let totals = Dictionary(grouping: bases, by: { $0.1 }).mapValues(\.count)
+        var seen: [String: Int] = [:]
+        var titles: [String: String] = [:]
+        for (id, base) in bases {
+            guard totals[base, default: 0] > 1 else { titles[id] = base; continue }
+            let number = seen[base, default: 0] + 1
+            seen[base] = number
+            titles[id] = "\(base) · \(number)"
+        }
+        self.titles = titles
+        self.created = created
     }
 
-    private static func baseTitle(for wallpaper: Wallpaper, formatter: DateFormatter) -> String {
+    private static func baseTitle(for wallpaper: Wallpaper, created: Date?, formatter: DateFormatter) -> String {
         if let legacy = legacyDisplayTitle(wallpaper.name) { return legacy }
         let lowered = wallpaper.name.lowercased()
         guard let template = PromptTemplate.shared.map(\.id)
@@ -943,15 +958,12 @@ final class WallpaperTitleCache {
               let name = templateDisplayTitle(template) else {
             return wallpaper.url.deletingPathExtension().lastPathComponent
         }
-        return "\(name) · \(formatter.string(from: day(of: wallpaper, lowered: lowered)))"
-    }
-
-    private static func day(of wallpaper: Wallpaper, lowered: String) -> Date {
+        var day = created ?? Date()
         if let range = lowered.range(of: #"daily-\d{4}-\d{2}-\d{2}"#, options: .regularExpression),
-           let date = dayParser.date(from: String(lowered[range].dropFirst("daily-".count))) {
-            return date
+           let parsed = dayParser.date(from: String(lowered[range].dropFirst("daily-".count))) {
+            day = parsed
         }
-        return (try? wallpaper.url.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date()
+        return "\(name) · \(formatter.string(from: day))"
     }
 }
 
