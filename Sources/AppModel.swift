@@ -232,7 +232,7 @@ final class AppModel {
         if selection.ids.isEmpty, let first = wallpapers.first?.id { selectedID = first }
         var parts = [L("已移到垃圾桶 \(summary.trashed) 張")]
         if summary.skippedInUse > 0 { parts.append(L("略過 \(summary.skippedInUse) 張（正在當桌布）")) }
-        if summary.skippedOther > 0 { parts.append(L("略過 \(summary.skippedOther) 張（內建示範、替身捷徑或不在資料夾內）")) }
+        if summary.skippedOther > 0 { parts.append(L("略過 \(summary.skippedOther) 張（內建示範、替身捷徑、不在資料夾內或檔案已不存在）")) }
         if summary.failed > 0 { parts.append(L("\(summary.failed) 張無法移動")) }
         statusMessage = parts.joined(separator: L("，")) + L("。")
         return summary
