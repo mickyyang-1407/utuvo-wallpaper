@@ -60,9 +60,15 @@ enum SelfTest {
             return results
         }
 
+        var displays: [UInt32] = [1]
+        private(set) var perDisplay: [(UInt32?, String)] = []
+
         func setWallpaper(_ url: URL, onDisplayID: UInt32?) async -> [ScreenApplyResult] {
-            await setWallpaperOnAllScreens(url)
+            perDisplay.append((onDisplayID, url.lastPathComponent))
+            return await setWallpaperOnAllScreens(url)
         }
+
+        func displayIDs() -> [UInt32] { displays }
     }
 
     /// 假的圖片 provider：不連網。可以立刻回應、等到被取消、或直接回取消錯誤。
@@ -177,6 +183,24 @@ enum SelfTest {
                 emptyPromptRejected = false
             }
             record("空提示詞：送出前就被擋下", emptyPromptRejected, "擋下空白提示詞")
+
+        do {
+            let suiteName = "selftest.language.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let startsSystem = AppLanguage.current(defaults: defaults) == .system
+            AppLanguage.apply(.english, defaults: defaults)
+            let english = AppLanguage.current(defaults: defaults) == .english
+            AppLanguage.apply(.traditionalChinese, defaults: defaults)
+            let chinese = AppLanguage.current(defaults: defaults) == .traditionalChinese
+            AppLanguage.apply(.system, defaults: defaults)
+            let backToSystem = AppLanguage.current(defaults: defaults) == .system
+            let codes = AppLanguage.from(languageCode: "zh-Hant-TW") == .traditionalChinese
+                && AppLanguage.from(languageCode: "en-GB") == .english
+                && AppLanguage.from(languageCode: "ja") == .system
+            defaults.removePersistentDomain(forName: suiteName)
+            record("語言選擇：英文／繁中／跟隨系統可寫入並讀回", startsSystem && english && chinese && backToSystem && codes,
+                   "隔離 defaults 網域，不動使用者設定")
+        }
 
             // 4) 圖片 decode + 6K 輸出
             let sourcePNG = (try? Self.makeGradientPNG(width: 3840, height: 2160)) ?? Data()
@@ -474,6 +498,70 @@ enum SelfTest {
                    && resumedModel.selected?.pixelWidth == 6144 && resumedModel.selected?.pixelHeight == 3456,
                    "假桌面跨兩個 worker model，未改動真實桌面")
             resumedModel.setRotationMode(.off)
+
+            // 第一梯隊：頻率、暫停、每顆螢幕不同張、上一張
+            let intervalsOK = RotationController.Mode.fifteenMinutes.interval == 900
+                && RotationController.Mode.thirtyMinutes.interval == 1800 && RotationController.Mode.daily.interval == 86_400
+                && RotationController.Mode.allCases.count == 7
+            let planOK = RotationPlan.next(pool: ["a", "b", "c"], after: "b", count: 3) == ["c", "a", "b"]
+                && RotationPlan.next(pool: ["a", "b"], after: "gone", count: 1) == ["a"]
+                && RotationPlan.next(pool: [], after: nil, count: 2).isEmpty
+                && RotationPlan.previous(in: ["a", "b", "c"], existing: ["a", "b", "c"])?.id == "b"
+                && RotationPlan.previous(in: ["a", "b", "c"], existing: ["a", "c"])?.id == "a"
+                && RotationPlan.previous(in: ["a", "a"], existing: ["a"]) == nil
+            let urlCases: [(String, WallpaperCommand?)] = [
+                ("utuvo-wallpaper://next", .next), ("UTUVO-Wallpaper://Previous", .previous), ("utuvo-wallpaper:favorite", .favorite),
+                ("utuvo-wallpaper://toggle-pause", .togglePause), ("utuvo-wallpaper://delete", nil), ("https://next", nil)]
+            let urlMiss = urlCases.filter { URL(string: $0.0).flatMap(WallpaperCommand.init(url:)) != $0.1 }
+            record("捷徑網址：next／previous／favorite／toggle-pause 解析、大小寫不拘、其他網址與未知指令不動作",
+                   urlMiss.isEmpty, urlMiss.isEmpty ? "\(urlCases.count) 例" : "\(urlMiss.map(\.0))")
+            record("輪換頻率與挑圖：7 種頻率、游標往後挑、圖池少時重複、上一張略過已刪除",
+                   intervalsOK && planOK, "純函式")
+
+            let multiDesktop = FakeDesktop()
+            multiDesktop.displays = [11, 22, 33]
+            multiDesktop.results = [ScreenApplyResult(index: 0, name: "fixture", displayID: 1,
+                originalWallpaper: nil, applied: true, readbackMatched: true, error: nil)]
+            let multiModel = AppModel(desktop: multiDesktop, preferences: testDefaults, isBackgroundWorker: true)
+            multiModel.targetDisplayID = nil
+            multiModel.rotationPerDisplay = true
+            multiModel.setRotationMode(.fifteenMinutes)
+            testDefaults.removeObject(forKey: "rotation.lastAttempt")
+            testDefaults.removeObject(forKey: "rotation.history")
+            let t0 = Date()
+            multiModel.setRotationPaused(true)
+            await multiModel.performBackgroundRotation(at: t0)
+            let pausedOK = multiDesktop.perDisplay.isEmpty
+            multiModel.setRotationPaused(false)
+            await multiModel.performBackgroundRotation(at: t0)
+            let firstRound = multiDesktop.perDisplay
+            let distinctDisplays = firstRound.map { $0.0 } == [11, 22, 33]
+            let poolSize = multiModel.rotationPool().count
+            let distinctImages = Set(firstRound.map { $0.1 }).count == min(3, poolSize)
+            await multiModel.performBackgroundRotation(at: t0.addingTimeInterval(600))
+            let notYet = multiDesktop.perDisplay.count == 3
+            await multiModel.performBackgroundRotation(at: t0.addingTimeInterval(901))
+            let secondRound = multiDesktop.perDisplay.count == 6
+            record("每顆螢幕不同張：暫停時不換、三顆螢幕各一張、15 分鐘內不重換",
+                   pausedOK && distinctDisplays && distinctImages && notYet && secondRound,
+                   "圖池 \(poolSize) 張；第一輪 \(firstRound.map { "\($0.0 ?? 0):\($0.1)" })")
+
+            multiModel.rotationPerDisplay = false
+            await multiModel.skipToNext(at: t0.addingTimeInterval(999))
+            let beforePrevious = multiModel.selectedID
+            await multiModel.skipToNext(at: t0.addingTimeInterval(1000))
+            let afterNext = multiModel.selectedID
+            await multiModel.applyPrevious(at: t0.addingTimeInterval(1001))
+            let history = testDefaults.stringArray(forKey: "rotation.history") ?? []
+            let skipKeepsBackground = (testDefaults.object(forKey: "rotation.lastAttempt") as? Date) == t0.addingTimeInterval(1001)
+            record("上一張／立即下一張：下一張換圖、上一張回到前一張、背景計時重算",
+                   afterNext != nil && afterNext != beforePrevious && multiModel.selectedID == beforePrevious
+                   && history.last == multiModel.selectedID && skipKeepsBackground,
+                   "前 \(beforePrevious ?? "nil") → 下 \(afterNext ?? "nil") → 回 \(multiModel.selectedID ?? "nil")")
+            multiModel.setRotationMode(.off)
+            for key in ["rotation.perDisplay", "rotation.paused", "rotation.history", "rotation.lastAttempt", "rotation.lastID"] {
+                testDefaults.removeObject(forKey: key)
+            }
 
             // 10) 取消：舊 Task 還在收尾時必須維持 busy，第二批不能開
             let cancelProvider = FakeProvider(behavior: .blockUntilCancelled)

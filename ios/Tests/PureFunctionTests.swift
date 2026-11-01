@@ -203,3 +203,24 @@ final class CategoryTests: XCTestCase {
                        ["all", "favorites", "c-自然", "c-極簡", "c-抽象", "c-插畫", "c-宇宙", "c-水彩", "c-建築", "c-動畫", "c-其他"])
     }
 }
+
+final class AppLanguageTests: XCTestCase {
+    func testApplyAndReadBack() {
+        let suiteName = "test.language.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        XCTAssertEqual(AppLanguage.current(defaults: defaults), .system)
+        AppLanguage.apply(.english, defaults: defaults)
+        XCTAssertEqual(AppLanguage.current(defaults: defaults), .english)
+        AppLanguage.apply(.traditionalChinese, defaults: defaults)
+        XCTAssertEqual(AppLanguage.current(defaults: defaults), .traditionalChinese)
+        AppLanguage.apply(.system, defaults: defaults)
+        XCTAssertEqual(AppLanguage.current(defaults: defaults), .system)
+    }
+
+    func testLanguageCodes() {
+        XCTAssertEqual(AppLanguage.from(languageCode: "zh-Hant-TW"), .traditionalChinese)
+        XCTAssertEqual(AppLanguage.from(languageCode: "en-GB"), .english)
+        XCTAssertEqual(AppLanguage.from(languageCode: "ja"), .system)
+    }
+}

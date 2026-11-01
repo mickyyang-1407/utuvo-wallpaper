@@ -23,6 +23,8 @@ targets:
         group: Shared
       - path: ../Sources/DailyBatch.swift
         group: Shared
+      - path: ../Sources/AppLanguage.swift
+        group: Shared
       - path: Resources
       - path: Localization
         excludes:

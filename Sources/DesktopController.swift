@@ -9,6 +9,8 @@ protocol DesktopApplying: AnyObject {
     /// 逐螢幕設定桌布，回傳每顆螢幕的結果。
     func setWallpaperOnAllScreens(_ url: URL) async -> [ScreenApplyResult]
     func setWallpaper(_ url: URL, onDisplayID: UInt32?) async -> [ScreenApplyResult]
+    /// 目前接著的螢幕（每顆螢幕輪換不同張時用）。
+    func displayIDs() -> [UInt32]
 }
 
 // MARK: - 桌面控制
@@ -120,6 +122,8 @@ final class DesktopController: DesktopApplying {
         }
         return results
     }
+
+    func displayIDs() -> [UInt32] { Self.currentScreens().map { Self.displayID(of: $0) } }
 
     static func displayID(of screen: NSScreen) -> CGDirectDisplayID {
         let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber

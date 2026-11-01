@@ -24,6 +24,14 @@ final class AppModel {
     var rotationFavoritesOnly = false {
         didSet { preferences.set(rotationFavoritesOnly, forKey: "rotation.favoritesOnly") }
     }
+    /// 每顆螢幕輪換不同張（只在「套用到所有螢幕」時有效）。
+    var rotationPerDisplay = false {
+        didSet { preferences.set(rotationPerDisplay, forKey: "rotation.perDisplay") }
+    }
+    /// 暫停：輪換與日夜切換都先停，設定保留。
+    var isRotationPaused = false {
+        didSet { preferences.set(isRotationPaused, forKey: "rotation.paused") }
+    }
     var targetDisplayID: UInt32? {
         didSet {
             if let targetDisplayID { preferences.set(Int(targetDisplayID), forKey: "rotation.displayID") }
@@ -103,6 +111,8 @@ final class AppModel {
         self.dailyMode = self.daily.mode
         self.rotationMode = preferences.string(forKey: "rotation.mode").flatMap(RotationController.Mode.init(rawValue:)) ?? .off
         self.rotationFavoritesOnly = preferences.bool(forKey: "rotation.favoritesOnly")
+        self.rotationPerDisplay = preferences.bool(forKey: "rotation.perDisplay")
+        self.isRotationPaused = preferences.bool(forKey: "rotation.paused")
         self.targetDisplayID = (preferences.object(forKey: "rotation.displayID") as? NSNumber)?.uint32Value
         self.rotation.onTick = { [weak self] in self?.rotationTick() }
         reload()
@@ -291,10 +301,92 @@ final class AppModel {
 
     /// 定時輪換的一次跳動：換下一張並設為桌面。
     func rotationTick() {
-        guard !preferences.bool(forKey: "dynamic.enabled") else { return }
+        guard !preferences.bool(forKey: "dynamic.enabled"), !preferences.bool(forKey: "rotation.paused") else { return }
         Task { [weak self] in
             guard let self else { return }
-            await self.step(1, applyToDesktop: true)
+            let pool = self.rotationFavoritesOnly ? self.wallpapers.filter { self.favoriteIDs.contains($0.id) } : self.wallpapers
+            guard !pool.isEmpty else {
+                if self.rotationFavoritesOnly {
+                    self.stopRotation()
+                    self.errorMessage = L("還沒有收藏的桌布，輪換已停止。")
+                }
+                return
+            }
+            await self.rotateDesktop(pool: pool)
+        }
+    }
+
+    // MARK: - 選單列／快捷鍵／捷徑共用的桌面操作
+
+    /// 背景輪換用的圖池：6K 成品（＋僅收藏）。
+    func rotationPool() -> [Wallpaper] {
+        wallpapers.filter {
+            $0.pixelWidth >= Int(ImageResampler.sixK.width) && $0.pixelHeight >= Int(ImageResampler.sixK.height) &&
+            (!rotationFavoritesOnly || favoriteIDs.contains($0.id))
+        }
+    }
+
+    /// 立刻換下一張（選單列、快捷鍵、捷徑）。會把「上次輪換時間」設成現在，背景不會馬上又換掉。
+    func skipToNext(at date: Date = Date()) async {
+        guard !isDynamicActive else { statusMessage = L("日夜模式啟用中，桌布依時段切換。"); return }
+        reload()
+        let pool = rotationPool().isEmpty ? wallpapers : rotationPool()
+        guard !pool.isEmpty else { errorMessage = L("沒有可套用的圖片。"); return }
+        preferences.set(date, forKey: "rotation.lastAttempt")
+        await rotateDesktop(pool: pool)
+    }
+
+    /// 回到上一張套用過的桌布。
+    func applyPrevious(at date: Date = Date()) async {
+        guard !isDynamicActive else { statusMessage = L("日夜模式啟用中，桌布依時段切換。"); return }
+        reload()
+        var history = preferences.stringArray(forKey: "rotation.history") ?? []
+        guard let target = RotationPlan.previous(in: history, existing: Set(wallpapers.map(\.id))),
+              let wallpaper = wallpapers.first(where: { $0.id == target.id }) else {
+            statusMessage = L("沒有上一張可以回去。"); return
+        }
+        history = target.remaining
+        preferences.set(history, forKey: "rotation.history")
+        preferences.set(date, forKey: "rotation.lastAttempt")
+        preferences.set(wallpaper.id, forKey: "rotation.lastID")
+        selectedID = wallpaper.id
+        await apply(wallpaper, recordHistory: false)
+    }
+
+    /// 收藏／取消收藏主螢幕目前的桌布。回傳是否找到那張。
+    @discardableResult
+    func toggleFavoriteForCurrentDesktop() -> Bool {
+        reload()
+        let current = Set(inUseWallpaperURLs().map { $0.standardizedFileURL.path })
+        guard let wallpaper = wallpapers.first(where: { current.contains($0.url.standardizedFileURL.path) }) else {
+            statusMessage = L("目前桌布不在圖庫裡。"); return false
+        }
+        toggleFavorite(wallpaper)
+        statusMessage = favoriteIDs.contains(wallpaper.id) ? L("已收藏：\(wallpaper.name)") : L("已取消收藏：\(wallpaper.name)")
+        return true
+    }
+
+    func setRotationPaused(_ paused: Bool) {
+        isRotationPaused = paused
+        preferences.synchronize()
+        statusMessage = paused ? L("輪換已暫停。") : L("輪換已繼續。")
+    }
+
+    /// 從游標往後挑；每顆螢幕不同張時一次挑「螢幕數」張，分別套用。
+    private func rotateDesktop(pool: [Wallpaper]) async {
+        let displays = rotationPerDisplay && targetDisplayID == nil ? desktop.displayIDs() : []
+        let picks = RotationPlan.next(pool: pool.map(\.id), after: preferences.string(forKey: "rotation.lastID"),
+                                      count: max(1, displays.count))
+        guard let first = picks.first, let firstWallpaper = pool.first(where: { $0.id == first }) else { return }
+        preferences.set(picks.last, forKey: "rotation.lastID")
+        selectedID = first
+        if displays.count > 1 {
+            let assignments = zip(displays, picks).compactMap { display, id in
+                pool.first { $0.id == id }.map { (display, $0) }
+            }
+            await applyPerDisplay(assignments)
+        } else {
+            await apply(firstWallpaper)
         }
     }
 
@@ -320,7 +412,8 @@ final class AppModel {
     /// A worker resumes its own cursor and rotates only full-size 6K output.
     func performBackgroundRotation(at date: Date) async {
         if preferences.bool(forKey: "dynamic.enabled") {
-            let phase = DynamicPhase.current(at: date)
+            guard !preferences.bool(forKey: "rotation.paused") else { return }
+            let phase = DynamicPhase.current(at: date, defaults: preferences)
             let directory = preferences.string(forKey: "dynamic.activeDirectory").map { URL(fileURLWithPath: $0) }
                 ?? DynamicScene.directory
             let url = directory.appendingPathComponent(phase.rawValue + ".jpg")
@@ -334,25 +427,18 @@ final class AppModel {
             }
             return
         }
+        guard !preferences.bool(forKey: "rotation.paused") else { return }
         guard let interval = rotationMode.interval else { return }
         let previous = preferences.object(forKey: "rotation.lastAttempt") as? Date
         guard previous == nil || date.timeIntervalSince(previous!) >= interval else { return }
         reload()
-        let pool = wallpapers.filter {
-            $0.pixelWidth >= Int(ImageResampler.sixK.width) && $0.pixelHeight >= Int(ImageResampler.sixK.height) &&
-            (!rotationFavoritesOnly || favoriteIDs.contains($0.id))
-        }
+        let pool = rotationPool()
         guard !pool.isEmpty else {
             statusMessage = L("等待可輪換的 6K 桌布。")
             return
         }
-        let cursor = preferences.string(forKey: "rotation.lastID")
-        let nextIndex = pool.firstIndex(where: { $0.id == cursor }).map { ($0 + 1) % pool.count } ?? 0
-        let next = pool[nextIndex]
         preferences.set(date, forKey: "rotation.lastAttempt")
-        preferences.set(next.id, forKey: "rotation.lastID")
-        selectedID = next.id
-        await apply(next)
+        await rotateDesktop(pool: pool)
     }
 
     private func step(_ delta: Int, applyToDesktop: Bool) async {
@@ -382,7 +468,7 @@ final class AppModel {
     /// 成功與否以「讀回相符」為準：
     /// - 沒有任何螢幕 → 失敗（不能顯示成功）。
     /// - 設定成功但讀回不符 → 算失敗（不能顯示成功卻讀回 0 顆）。
-    func apply(_ wallpaper: Wallpaper, preserveDynamic: Bool = false) async {
+    func apply(_ wallpaper: Wallpaper, preserveDynamic: Bool = false, recordHistory: Bool = true) async {
         guard !isApplying else { return }
         isApplying = true
         defer { isApplying = false }
@@ -404,6 +490,7 @@ final class AppModel {
         if failed == 0 && unreadable == 0 {
             statusMessage = L("已設為目前桌布：\(wallpaper.name)（\(results.count) 顆螢幕，讀回相符 \(matched) 顆）。")
             errorMessage = nil
+            if recordHistory && !preserveDynamic { pushHistory(wallpaper.id) }
         } else {
             var parts: [String] = []
             if failed > 0 { parts.append(L("\(failed) 顆設定失敗")) }
@@ -412,6 +499,35 @@ final class AppModel {
             errorMessage = L("桌布套用尚未完全確認：\(joined)。")
             statusMessage = L("已嘗試設為目前桌布：\(wallpaper.name)（\(results.count) 顆螢幕，讀回相符 \(matched) 顆）。")
         }
+    }
+
+    /// 每顆螢幕各套一張。成功與否一樣以讀回為準。
+    private func applyPerDisplay(_ assignments: [(UInt32, Wallpaper)]) async {
+        guard !isApplying, !assignments.isEmpty else { return }
+        isApplying = true
+        defer { isApplying = false }
+        preferences.set(false, forKey: "dynamic.enabled")
+        dynamicRevision += 1
+        var results: [ScreenApplyResult] = []
+        for (display, wallpaper) in assignments {
+            results += await desktop.setWallpaper(wallpaper.url, onDisplayID: display)
+        }
+        let ok = results.filter { $0.applied && $0.readbackMatched }.count
+        if !results.isEmpty && ok == results.count {
+            statusMessage = L("已在 \(assignments.count) 顆螢幕各換一張（讀回相符 \(ok) 顆）。")
+            errorMessage = nil
+            pushHistory(assignments[0].1.id)
+        } else if results.isEmpty {
+            errorMessage = L("找不到任何螢幕，桌布沒有套用。")
+        } else {
+            errorMessage = L("桌布套用尚未完全確認：讀回相符 \(ok)／\(results.count) 顆。")
+        }
+    }
+
+    private func pushHistory(_ id: String) {
+        var history = preferences.stringArray(forKey: "rotation.history") ?? []
+        if history.last != id { history.append(id) }
+        preferences.set(Array(history.suffix(RotationPlan.historyLimit)), forKey: "rotation.history")
     }
 
     func applySelected() async {

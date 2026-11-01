@@ -69,7 +69,9 @@ func categoryTitle(_ name: String) -> String {
 }
 
 struct ContentView: View {
-    @State private var model = AppModel()
+    @State private var model: AppModel
+
+    init(model: AppModel) { _model = State(initialValue: model) }
     @State private var section: SidebarSelection? = .section(.all)
     @State private var search = ""
     @State private var newestFirst = false
@@ -396,10 +398,10 @@ struct ContentView: View {
         }
     }
 
-    private func nextPhase(after date: Date) -> DynamicPhase {
-        let hour = Calendar.current.component(.hour, from: date)
-        let ordered = DynamicPhase.allCases.sorted { $0.startHour < $1.startHour }
-        return ordered.first { $0.startHour > hour } ?? ordered[0]
+    /// 「下次切換 18:42 黃昏」；跟著淺色／深色時沒有固定時刻。
+    private func nextSwitchText(after date: Date) -> String {
+        guard let next = DynamicSchedule.load().next(after: date) else { return L("跟著系統淺色／深色切換") }
+        return L("下次切換 \(Self.clockFormatter.string(from: next.at)) \(next.phase.title)")
     }
 
     // MARK: - 網格
@@ -577,8 +579,7 @@ struct ContentView: View {
         var facts: [String] = []
         if todayTotal > 0 { facts.append(L("今天新增 \(todayTotal) 張")) }
         if model.isDynamicActive {
-            let next = nextPhase(after: now)
-            facts.append(L("下次切換 \(next.time) \(next.title)"))
+            facts.append(nextSwitchText(after: now))
         }
         facts.append(L("\(shares.count) 個分類"))
         return VStack(alignment: .leading, spacing: 0) {
@@ -671,10 +672,9 @@ struct ContentView: View {
             }
         } else if model.isDynamicActive {
             let current = DynamicPhase.current(at: now)
-            let next = nextPhase(after: now)
             statusCardBody(tone: .green, symbol: "checkmark",
                            title: L("日夜模式已啟用"),
-                           detail: L("現在是\(current.title)，\(next.time) 換\(next.title)。")) {
+                           detail: L("現在是\(current.title)，\(nextSwitchText(after: now))。")) {
                 Button("查看") { section = .section(.dynamic) }
             }
         } else {
@@ -802,7 +802,12 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     if let scene = previewedScene {
                         dynamicHero(scene, phase: shown, isNow: shown == current)
-                        dynamicTimeline(now: now, shown: shown)
+                        if DynamicTiming.load() == .appearance {
+                            Label("跟著系統淺色／深色：淺色顯示白天、深色顯示夜晚。", systemImage: "circle.lefthalf.filled")
+                                .font(.system(size: 13)).foregroundStyle(WallpaperPalette.secondaryText)
+                        } else {
+                            dynamicTimeline(now: now, shown: shown)
+                        }
                         phaseCards(current: current, shown: shown)
                     } else {
                         ContentUnavailableView("尚無日夜場景", systemImage: "sun.max",
@@ -875,8 +880,9 @@ struct ContentView: View {
     }
 
     private func dynamicTimeline(now: Date, shown: DynamicPhase) -> some View {
-        let segments = DynamicPhase.timelineSegments
+        let segments = DynamicSchedule.load().segments(on: now)
         let fraction = DynamicPhase.dayFraction(at: now)
+        let ticks = [0] + segments.dropFirst().map(\.start) + [1440]
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("24 小時").font(.system(size: 13, weight: .semibold))
@@ -896,7 +902,7 @@ struct ContentView: View {
                             let active = segment.phase == shown
                             Self.phaseColor(segment.phase)
                                 .opacity(active ? 1 : 0.6)
-                                .frame(width: width * CGFloat(segment.end - segment.start) / 24)
+                                .frame(width: width * CGFloat(segment.end - segment.start) / 1440)
                                 .overlay(alignment: .leading) { Rectangle().fill(Color.black.opacity(0.18)).frame(width: 1) }
                                 .contentShape(Rectangle())
                                 .onHover { inside in
@@ -925,13 +931,13 @@ struct ContentView: View {
                         .foregroundStyle(WallpaperPalette.canvas)
                         .position(x: min(max(width * fraction, 24), width - 24), y: 46)
                         .allowsHitTesting(false)
-                    ForEach([0, 6, 9, 18, 21, 24], id: \.self) { hour in
-                        Text(String(format: "%02d", hour))
+                    ForEach(ticks, id: \.self) { minute in
+                        Text(minute % 60 == 0 ? String(format: "%02d", minute / 60) : DynamicSchedule.clock(minute))
                             .font(.system(size: 10)).monospacedDigit()
                             .foregroundStyle(WallpaperPalette.secondaryText)
                             .fixedSize()
-                            .position(x: min(max(width * CGFloat(hour) / 24, 8), width - 8), y: 64)
-                            .opacity(abs(width * CGFloat(hour) / 24 - width * fraction) < 30 ? 0 : 1)
+                            .position(x: min(max(width * CGFloat(minute) / 1440, 12), width - 12), y: 64)
+                            .opacity(abs(width * CGFloat(minute) / 1440 - width * fraction) < 30 ? 0 : 1)
                     }
                 }
             }
@@ -1096,7 +1102,7 @@ struct ContentView: View {
                             Text(DynamicScene.shortTitle(previewedScene?.title ?? DynamicScene.title)).font(.headline).lineLimit(2)
                                 .truncationMode(.tail)
                                 .help(previewedScene?.title ?? DynamicScene.title)
-                            Text("\(phase.title) · \(phase.time) 起").font(.caption).monospacedDigit()
+                            Text("\(phase.title) · \(phase.range)").font(.caption).monospacedDigit()
                                 .foregroundStyle(WallpaperPalette.secondaryText)
                         }
                     }
@@ -1281,6 +1287,13 @@ struct ContentView: View {
                     ForEach(RotationController.Mode.allCases) { Text($0.title).tag($0) }
                 }
                 Toggle("僅輪換收藏", isOn: $model.rotationFavoritesOnly)
+                Toggle("每顆螢幕輪換不同張", isOn: $model.rotationPerDisplay)
+                    .disabled(model.targetDisplayID != nil)
+                    .help("只在「套用到：所有螢幕」時有效")
+                Toggle("暫停輪換與日夜切換", isOn: Binding(get: { model.isRotationPaused }, set: { model.setRotationPaused($0) }))
+            }
+            Section("日夜切換時間") {
+                DynamicTimingControls { model.dynamicRevision += 1 }
             }
             Section("每日生成") {
                 Picker("張數", selection: Binding(get: { model.dailyMode }, set: { model.setDailyMode($0) })) {
@@ -1291,7 +1304,7 @@ struct ContentView: View {
                 Button("背景服務設定") { showSchedule = false; showSettings = true }
             }
         }
-        .formStyle(.grouped).frame(width: 380, height: 350)
+        .formStyle(.grouped).frame(width: 400, height: 560)
     }
 
     private var statusBar: some View {

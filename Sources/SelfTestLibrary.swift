@@ -214,21 +214,56 @@ extension SelfTest {
         record("Dynamic：場景短名取第一個分隔符號前的片段", shortMiss.isEmpty, shortMiss.isEmpty ? "\(shortCases.count) 例" : "\(shortMiss)")
 
         // MARK: Dynamic 時間軸與場景庫
-        let segments = DynamicPhase.timelineSegments
+        let fixed = DynamicSchedule(timing: .fixed, coordinate: Coordinate(latitude: 25.03, longitude: 121.56))
+        let segments = fixed.segments(on: Date())
         let contiguous = zip(segments, segments.dropFirst()).allSatisfy { $0.end == $1.start }
-            && segments.first?.start == 0 && segments.last?.end == 24
+            && segments.first?.start == 0 && segments.last?.end == 1440
         let phasesMatch = segments.allSatisfy { segment in
-            (segment.start..<segment.end).allSatisfy { hour in
-                var parts = DateComponents(); parts.year = 2026; parts.month = 11; parts.day = 1; parts.hour = hour; parts.minute = 30
-                return Calendar.current.date(from: parts).map(DynamicPhase.current(at:)) == segment.phase
+            stride(from: segment.start, to: segment.end, by: 30).allSatisfy { minute in
+                var parts = DateComponents(); parts.year = 2026; parts.month = 11; parts.day = 1
+                parts.hour = minute / 60; parts.minute = minute % 60
+                return Calendar.current.date(from: parts).map { fixed.phase(at: $0) } == segment.phase
             }
         }
         var noon = DateComponents(); noon.year = 2026; noon.month = 11; noon.day = 1; noon.hour = 18; noon.minute = 0
         let fraction = Calendar.current.date(from: noon).map { DynamicPhase.dayFraction(at: $0) } ?? -1
-        record("Dynamic：時間軸 0–24 連續、夜晚跨午夜拆兩段、每小時色段與時段判斷一致、18:00 在 0.75",
+        record("Dynamic：時間軸 0–24 連續、夜晚跨午夜拆兩段、每半小時色段與時段判斷一致、18:00 在 0.75",
                contiguous && phasesMatch && segments.filter { $0.phase == .night }.count == 2 && abs(fraction - 0.75) < 0.0001
-                   && DynamicPhase.night.range == "21:00–06:00" && DynamicPhase.dusk.range == "18:00–21:00",
+                   && fixed.range(of: .night) == "21:00–06:00" && fixed.range(of: .dusk) == "18:00–21:00",
                "\(segments.map { "\($0.phase.rawValue)\($0.start)-\($0.end)" })")
+
+        // MARK: 日出日落／淺深色切換
+        var taipei = Calendar(identifier: .gregorian); taipei.timeZone = TimeZone(identifier: "Asia/Taipei")!
+        var london = Calendar(identifier: .gregorian); london.timeZone = TimeZone(identifier: "Europe/London")!
+        func day(_ calendar: Calendar, _ y: Int, _ m: Int, _ d: Int, _ h: Int = 12, _ min: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+        }
+        let tpe = Coordinate(latitude: 25.03, longitude: 121.56)
+        // 參考值（天文網站概值）：台北夏至約 05:05–18:47；冬至前後約 06:33–17:08、日照約 10 小時 34 分。
+        let summer = SolarCalculator.sunriseSunset(on: day(taipei, 2026, 6, 21), at: tpe, calendar: taipei)
+        let winter = SolarCalculator.sunriseSunset(on: day(taipei, 2026, 12, 21), at: tpe, calendar: taipei)
+        func near(_ value: Int?, _ expected: Int) -> Bool { value.map { abs($0 - expected) <= 4 } ?? false }
+        let solarOK = near(summer?.sunrise, 5 * 60 + 5) && near(summer?.sunset, 18 * 60 + 47)
+            && near(winter?.sunrise, 6 * 60 + 33) && near(winter?.sunset, 17 * 60 + 8)
+        record("日出日落：台北夏至／冬至與天文網站概值相差 4 分鐘內", solarOK,
+               "夏 \(summer.map { "\(DynamicSchedule.clock($0.sunrise))–\(DynamicSchedule.clock($0.sunset))" } ?? "nil")、冬 \(winter.map { "\(DynamicSchedule.clock($0.sunrise))–\(DynamicSchedule.clock($0.sunset))" } ?? "nil")")
+
+        let solar = DynamicSchedule(timing: .solar, coordinate: tpe)
+        let solarStarts = solar.starts(on: day(taipei, 2026, 12, 21), calendar: taipei)
+        let solarPhases = [(6, 20, DynamicPhase.dawn), (8, 10, .day), (15, 50, .dusk), (17, 50, .night), (3, 0, .night)]
+            .allSatisfy { solar.phase(at: day(taipei, 2026, 12, 21, $0.0, $0.1), calendar: taipei) == $0.2 }
+        let nextOK = solar.next(after: day(taipei, 2026, 12, 21, 23, 0), calendar: taipei).map {
+            $0.phase == .dawn && taipei.component(.day, from: $0.at) == 22 } ?? false
+        let polar = DynamicSchedule(timing: .solar, coordinate: Coordinate(latitude: 78.2, longitude: 15.6))
+            .starts(on: day(london, 2026, 6, 21), calendar: london) == DynamicSchedule.fixedStarts
+        let appearance = DynamicSchedule(timing: .appearance, coordinate: tpe)
+        let appearanceOK = appearance.phase(at: Date(), isDark: true) == .night && appearance.phase(at: Date(), isDark: false) == .day
+            && appearance.segments(on: Date()).isEmpty && appearance.next(after: Date()) == nil
+        let tzOK = Coordinate.estimate(for: TimeZone(identifier: "Asia/Taipei")!) == tpe
+            && abs(Coordinate.estimate(for: TimeZone(secondsFromGMT: 3 * 3600)!).longitude - 45) < 0.01
+        record("日夜切換：日出日落四段順序正確、跨午夜找到明天清晨、極晝退回固定、淺深色對白天夜晚、時區推估位置",
+               solarPhases && nextOK && polar && appearanceOK && tzOK,
+               "冬至起點 \(DynamicPhase.allCases.map { DynamicSchedule.clock(solarStarts[$0]!) })")
 
         let sceneRoot = tempRoot.appendingPathComponent("scene-fixture", isDirectory: true)
         do {

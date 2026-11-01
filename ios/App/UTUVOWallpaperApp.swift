@@ -5,6 +5,7 @@ struct UTUVOWallpaperApp: App {
     @StateObject private var model = AppModel()
 
     init() {
+        _ = AppLanguage.atLaunch
         BackgroundScheduler.register()
     }
 

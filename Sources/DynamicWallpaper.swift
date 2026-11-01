@@ -14,14 +14,8 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
         case .night: return L("夜晚")
         }
     }
-    var time: String {
-        switch self {
-        case .dawn: return "06:00"
-        case .day: return "09:00"
-        case .dusk: return "18:00"
-        case .night: return "21:00"
-        }
-    }
+    /// 依目前設定的切換方式（固定／日出日落／淺深色）顯示開始時間。
+    var time: String { DynamicSchedule.load().startTime(of: self) }
     var startHour: Int {
         switch self {
         case .dawn: return 6
@@ -38,21 +32,7 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
         case .night: return "moon.stars"
         }
     }
-    /// 結束時刻（下一個時段的開始）。
-    var endHour: Int {
-        switch self {
-        case .dawn: return 9
-        case .day: return 18
-        case .dusk: return 21
-        case .night: return 6
-        }
-    }
-    var range: String { String(format: "%02d:00–%02d:00", startHour, endHour) }
-
-    /// 24 小時時間軸的色段（小時，0–24）。夜晚跨午夜拆成頭尾兩段。
-    static var timelineSegments: [(phase: DynamicPhase, start: Int, end: Int)] {
-        [(.night, 0, 6), (.dawn, 6, 9), (.day, 9, 18), (.dusk, 18, 21), (.night, 21, 24)]
-    }
+    var range: String { DynamicSchedule.load().range(of: self) }
 
     /// 一天中的位置（0…1），給「現在」指示線。
     static func dayFraction(at date: Date, calendar: Calendar = .current) -> Double {
@@ -60,13 +40,8 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
         return Double((parts.hour ?? 0) * 60 + (parts.minute ?? 0)) / 1440
     }
 
-    static func current(at date: Date) -> Self {
-        switch Calendar.current.component(.hour, from: date) {
-        case 6..<9: return .dawn
-        case 9..<18: return .day
-        case 18..<21: return .dusk
-        default: return .night
-        }
+    static func current(at date: Date, defaults: UserDefaults = .standard) -> Self {
+        DynamicSchedule.load(defaults).phase(at: date)
     }
 }
 

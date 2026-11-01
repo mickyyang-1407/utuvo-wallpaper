@@ -4,12 +4,22 @@ import SwiftUI
 
 // MARK: - App 模式
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow?
+    private var model: AppModel?
+    private var menuBar: MenuBarController?
+    private let hotKeys = HotKeyCenter()
+    /// 由網址啟動時，網址可能比 didFinishLaunching 早到；先排著。
+    private var pendingCommands: [WallpaperCommand] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let content = NSHostingController(rootView: ContentView())
+        let model = AppModel()
+        self.model = model
+        let content = NSHostingController(rootView: ContentView(model: model))
         let window = NSWindow(contentViewController: content)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
         window.title = LabPaths.appName
         window.titleVisibility = .visible
         window.titlebarAppearsTransparent = true
@@ -41,9 +51,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editItem.submenu = editMenu
         menu.addItem(editItem)
         NSApp.mainMenu = menu
+
+        menuBar = MenuBarController(model: model) { [weak self] in self?.showWindow() }
+        refreshMenuBarAndHotKeys()
+        NotificationCenter.default.addObserver(forName: MenuBarPreferences.changed, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshMenuBarAndHotKeys() }
+        }
+        let queued = pendingCommands
+        pendingCommands = []
+        for command in queued { Task { await command.perform(on: model) } }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    private func refreshMenuBarAndHotKeys() {
+        menuBar?.refresh()
+        hotKeys.refresh { [weak self] command in
+            guard let model = self?.model else { return }
+            Task { await command.perform(on: model) }
+        }
+    }
+
+    /// 選單列圖示開著時，關掉視窗只是收到選單列（Dock 圖示也收起來），快捷鍵照常可用。
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !MenuBarPreferences.showsIcon }
+
+    func windowWillClose(_ notification: Notification) {
+        if MenuBarPreferences.showsIcon { NSApp.setActivationPolicy(.accessory) }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { showWindow() }
+        return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for command in urls.compactMap(WallpaperCommand.init(url:)) {
+            if let model { Task { await command.perform(on: model) } } else { pendingCommands.append(command) }
+        }
+    }
+
+    private func showWindow() {
+        NSApp.setActivationPolicy(.regular)
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
     @objc private func openSettings(_ sender: Any?) {
         NotificationCenter.default.post(name: .wallpaperOpenSettings, object: nil)
     }
@@ -64,9 +113,12 @@ if let mode = CLI.parse(cliArguments) {
     // 讓 main actor 有機會執行（main queue 由主 run loop 服務）。
     RunLoop.main.run()
 } else {
-    let app = NSApplication.shared
-    let delegate = AppDelegate()
-    app.delegate = delegate
-    app.setActivationPolicy(.regular)
-    app.run()
+    _ = AppLanguage.atLaunch
+    MainActor.assumeIsolated {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        app.setActivationPolicy(.regular)
+        app.run()
+    }
 }

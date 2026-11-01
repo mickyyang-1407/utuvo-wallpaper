@@ -5,10 +5,25 @@ struct SettingsView: View {
     @State private var keyInput = ""
     @State private var keyError: String?
     @State private var showGuide = UserDefaults.standard.bool(forKey: "UTUVOOpenGuide")
+    @State private var language = AppLanguage.current()
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    row("globe", Color(hex: 0x0A84FF)) {
+                        Picker(selection: Binding(get: { language }, set: { language = $0; AppLanguage.apply($0) })) {
+                            ForEach(AppLanguage.allCases) { Text(verbatim: $0.displayName).tag($0) }
+                        } label: {
+                            Text(verbatim: "語言 Language")
+                        }
+                    }
+                } footer: {
+                    if AppLanguage.needsRelaunch(selected: language) {
+                        Text(L("關閉並重新開啟 App 後套用新語言。"))
+                    }
+                }
+
                 Section {
                     row("key.fill", TileStyle.all.color) {
                         Text(L("OpenAI API key"))

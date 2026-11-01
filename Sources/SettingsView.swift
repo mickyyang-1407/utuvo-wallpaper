@@ -17,6 +17,9 @@ struct WallpaperSettingsView: View {
     @State private var backgroundEnabled = BackgroundService.isEnabled()
     @State private var backgroundLoaded = false
     @State private var backgroundSnapshot: BackgroundSnapshot?
+    @State private var language = AppLanguage.current()
+    @State private var showsMenuBarIcon = MenuBarPreferences.showsIcon
+    @State private var hotKeysEnabled = MenuBarPreferences.hotKeysEnabled
     private let keychain = KeychainCredentialStore()
 
     var body: some View {
@@ -29,6 +32,20 @@ struct WallpaperSettingsView: View {
             .padding(20)
             Divider()
             Form {
+                Section {
+                    Picker(selection: Binding(get: { language }, set: { setLanguage($0) })) {
+                        ForEach(AppLanguage.allCases) { Text(verbatim: $0.displayName).tag($0) }
+                    } label: {
+                        Text(verbatim: "語言 Language")
+                    }
+                    if AppLanguage.needsRelaunch(selected: language) {
+                        HStack {
+                            Text("重新開啟 App 後套用新語言。").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("立即重新開啟") { relaunch() }
+                        }
+                    }
+                }
                 Section("生圖服務") {
                     LabeledContent("方式", value: "OpenAI Images API")
                     LabeledContent("模型", value: OpenAIImageProvider.model)
@@ -71,6 +88,18 @@ struct WallpaperSettingsView: View {
                             Text(snapshot.message).font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                }
+                Section("選單列與快捷鍵") {
+                    Toggle("在選單列顯示圖示", isOn: Binding(get: { showsMenuBarIcon }, set: {
+                        showsMenuBarIcon = $0; savePreference($0, MenuBarPreferences.iconKey) }))
+                    Text("開著時，關掉視窗 App 會留在選單列，可以隨時換下一張、上一張、收藏或暫停。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Toggle("全域快捷鍵", isOn: Binding(get: { hotKeysEnabled }, set: {
+                        hotKeysEnabled = $0; savePreference($0, MenuBarPreferences.hotKeysKey) }))
+                    Text("⌃⌥⌘→ 下一張　⌃⌥⌘← 上一張　⌃⌥⌘F 收藏　⌃⌥⌘P 暫停／繼續（App 開著或在選單列時有效）")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("捷徑 App：加入「打開 URL」動作，填 utuvo-wallpaper://next（也可用 previous、favorite、pause、resume）。")
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
                 Section("圖片儲存位置") {
                     Text(dataPath).font(.caption).textSelection(.enabled)
@@ -152,6 +181,30 @@ struct WallpaperSettingsView: View {
             error = nil
         } catch { self.error = error.localizedDescription }
         refreshBackground()
+    }
+
+    private func savePreference(_ value: Bool, _ key: String) {
+        UserDefaults.standard.set(value, forKey: key)
+        NotificationCenter.default.post(name: MenuBarPreferences.changed, object: nil)
+    }
+
+    private func setLanguage(_ value: AppLanguage) {
+        language = value
+        AppLanguage.apply(value)
+    }
+
+    /// 等目前這個行程結束後再用 open 重開，避免兩個視窗同時存在。
+    private func relaunch() {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "while /bin/kill -0 \"$1\" 2>/dev/null; do /bin/sleep 0.2; done; /usr/bin/open \"$2\"",
+                          "relaunch", String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath]
+        do {
+            try task.run()
+            // 設定是 sheet；sheet 開著時 terminate 會被擋下，先關掉再結束。
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { NSApp.terminate(nil) }
+        } catch { self.error = L("無法自動重新開啟，請手動結束後再開啟 App。") }
     }
 
     private func saveKey() {

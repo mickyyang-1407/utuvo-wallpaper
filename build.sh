@@ -53,15 +53,26 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3.0</string>
+    <string>0.4.0</string>
     <key>CFBundleVersion</key>
-    <string>3</string>
+    <string>4</string>
     <key>LSMinimumSystemVersion</key>
     <string>${DEPLOYMENT_TARGET}</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.utuvo.wallpaper-lab</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>utuvo-wallpaper</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST
@@ -88,6 +99,7 @@ for arch in $ARCHS; do
         -swift-version "${SWIFT_VERSION}" \
         -target "${arch}-apple-macosx${DEPLOYMENT_TARGET}" \
         -framework AppKit \
+        -framework Carbon \
         -framework SwiftUI \
         -framework ImageIO \
         -framework UniformTypeIdentifiers \

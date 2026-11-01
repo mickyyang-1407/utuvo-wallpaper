@@ -5,8 +5,11 @@ import Foundation
 final class RotationController {
     enum Mode: String, CaseIterable, Identifiable {
         case off
-        case hourly
         case fiveMinutes
+        case fifteenMinutes
+        case thirtyMinutes
+        case hourly
+        case daily
         case manual
 
         var id: String { rawValue }
@@ -14,8 +17,11 @@ final class RotationController {
         var title: String {
             switch self {
             case .off: return L("關閉（不輪換）")
-            case .hourly: return L("每小時")
             case .fiveMinutes: return L("每 5 分鐘")
+            case .fifteenMinutes: return L("每 15 分鐘")
+            case .thirtyMinutes: return L("每 30 分鐘")
+            case .hourly: return L("每小時")
+            case .daily: return L("每天")
             case .manual: return L("手動（按上一張／下一張時套用）")
             }
         }
@@ -23,8 +29,11 @@ final class RotationController {
         var interval: TimeInterval? {
             switch self {
             case .off, .manual: return nil
-            case .hourly: return 3600
             case .fiveMinutes: return 300
+            case .fifteenMinutes: return 900
+            case .thirtyMinutes: return 1800
+            case .hourly: return 3600
+            case .daily: return 86_400
             }
         }
     }
@@ -111,5 +120,29 @@ final class DailyScheduler {
         let calendar = Calendar.current
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+}
+
+/// 輪換挑圖與「上一張」的純函式，方便自我測試。
+enum RotationPlan {
+    static let historyLimit = 30
+
+    /// 從游標的下一張開始挑 `count` 張；圖池比螢幕少時會重複。游標不在圖池裡就從頭。
+    static func next(pool: [String], after cursor: String?, count: Int) -> [String] {
+        guard !pool.isEmpty, count > 0 else { return [] }
+        let start = cursor.flatMap { pool.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
+        return (0..<count).map { pool[(start + $0) % pool.count] }
+    }
+
+    /// 歷史最後一筆是目前這張；往前找第一張還存在、而且跟目前不同的。
+    /// `remaining` 是回去之後的新歷史（最後一筆就是回去的那張）。
+    static func previous(in history: [String], existing: Set<String>) -> (id: String, remaining: [String])? {
+        guard let current = history.last else { return nil }
+        var rest = Array(history.dropLast())
+        while let candidate = rest.last {
+            if candidate != current && existing.contains(candidate) { return (candidate, rest) }
+            rest.removeLast()
+        }
+        return nil
     }
 }
