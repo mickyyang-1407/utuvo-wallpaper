@@ -332,25 +332,37 @@ final class AppModel {
         reload()
         let pool = rotationPool().isEmpty ? wallpapers : rotationPool()
         guard !pool.isEmpty else { errorMessage = L("沒有可套用的圖片。"); return }
-        preferences.set(date, forKey: "rotation.lastAttempt")
-        await rotateDesktop(pool: pool)
+        if await rotateDesktop(pool: pool) != .busy { preferences.set(date, forKey: "rotation.lastAttempt") }
     }
 
-    /// 回到上一張套用過的桌布。
+    /// 回到上一筆套用過的桌布（每顆螢幕不同張時，逐螢幕還原）。套用成功才改歷史與游標。
     func applyPrevious(at date: Date = Date()) async {
         guard !isDynamicActive else { statusMessage = L("日夜模式啟用中，桌布依時段切換。"); return }
         reload()
-        var history = preferences.stringArray(forKey: "rotation.history") ?? []
-        guard let target = RotationPlan.previous(in: history, existing: Set(wallpapers.map(\.id))),
-              let wallpaper = wallpapers.first(where: { $0.id == target.id }) else {
+        let history = preferences.stringArray(forKey: "rotation.history") ?? []
+        guard let target = RotationPlan.previous(in: history, existing: Set(wallpapers.map(\.id))) else {
             statusMessage = L("沒有上一張可以回去。"); return
         }
-        history = target.remaining
-        preferences.set(history, forKey: "rotation.history")
+        guard !isApplying, let lease = try? FileLease.acquire(at: desktopLockURL) else {
+            statusMessage = L("正在換桌布，請稍後再試。"); return
+        }
+        defer { withExtendedLifetime(lease) {} }
+        let pairs = RotationPlan.decode(target.entry).compactMap { display, id in
+            wallpapers.first { $0.id == id }.map { (display, $0) }
+        }
+        let connected = Set(desktop.displayIDs())
+        let perDisplay = pairs.compactMap { display, wallpaper in display.flatMap { connected.contains($0) ? ($0, wallpaper) : nil } }
+        let ok: Bool
+        if pairs.first?.0 != nil, !perDisplay.isEmpty {
+            ok = await applyPerDisplay(perDisplay, recordHistory: false)
+        } else if let wallpaper = pairs.first?.1 {
+            ok = await apply(wallpaper, recordHistory: false)
+        } else { return }
+        guard ok else { return }
+        preferences.set(target.remaining, forKey: "rotation.history")
         preferences.set(date, forKey: "rotation.lastAttempt")
-        preferences.set(wallpaper.id, forKey: "rotation.lastID")
-        selectedID = wallpaper.id
-        await apply(wallpaper, recordHistory: false)
+        preferences.set(pairs.last?.1.id, forKey: "rotation.lastID")
+        selectedID = pairs.first?.1.id
     }
 
     /// 收藏／取消收藏主螢幕目前的桌布。回傳是否找到那張。
@@ -372,22 +384,33 @@ final class AppModel {
         statusMessage = paused ? L("輪換已暫停。") : L("輪換已繼續。")
     }
 
-    /// 從游標往後挑；每顆螢幕不同張時一次挑「螢幕數」張，分別套用。
-    private func rotateDesktop(pool: [Wallpaper]) async {
+    enum RotationOutcome { case busy, applied, failed }
+
+    /// GUI、選單列與背景 worker 共用：同一時間只有一方在換桌布。
+    private var desktopLockURL: URL { outputRoot.appendingPathComponent(".desktop-apply.lock") }
+
+    /// 從游標往後挑；每顆螢幕不同張時一次挑「螢幕數」張，分別套用。套用成功才移動游標。
+    @discardableResult
+    private func rotateDesktop(pool: [Wallpaper]) async -> RotationOutcome {
+        guard !isApplying, let lease = try? FileLease.acquire(at: desktopLockURL) else { return .busy }
+        defer { withExtendedLifetime(lease) {} }
         let displays = rotationPerDisplay && targetDisplayID == nil ? desktop.displayIDs() : []
         let picks = RotationPlan.next(pool: pool.map(\.id), after: preferences.string(forKey: "rotation.lastID"),
                                       count: max(1, displays.count))
-        guard let first = picks.first, let firstWallpaper = pool.first(where: { $0.id == first }) else { return }
-        preferences.set(picks.last, forKey: "rotation.lastID")
-        selectedID = first
+        guard let first = picks.first, let firstWallpaper = pool.first(where: { $0.id == first }) else { return .failed }
+        let ok: Bool
         if displays.count > 1 {
             let assignments = zip(displays, picks).compactMap { display, id in
                 pool.first { $0.id == id }.map { (display, $0) }
             }
-            await applyPerDisplay(assignments)
+            ok = await applyPerDisplay(assignments)
         } else {
-            await apply(firstWallpaper)
+            ok = await apply(firstWallpaper)
         }
+        guard ok else { return .failed }
+        preferences.set(picks.last, forKey: "rotation.lastID")
+        selectedID = first
+        return .applied
     }
 
     /// 設定輪換模式。UI 的 Picker 一定要走這裡：
@@ -437,8 +460,8 @@ final class AppModel {
             statusMessage = L("等待可輪換的 6K 桌布。")
             return
         }
-        preferences.set(date, forKey: "rotation.lastAttempt")
-        await rotateDesktop(pool: pool)
+        // 失敗也記一次嘗試，避免每分鐘重試；被另一方佔用（busy）則下一分鐘再來。
+        if await rotateDesktop(pool: pool) != .busy { preferences.set(date, forKey: "rotation.lastAttempt") }
     }
 
     private func step(_ delta: Int, applyToDesktop: Bool) async {
@@ -468,8 +491,9 @@ final class AppModel {
     /// 成功與否以「讀回相符」為準：
     /// - 沒有任何螢幕 → 失敗（不能顯示成功）。
     /// - 設定成功但讀回不符 → 算失敗（不能顯示成功卻讀回 0 顆）。
-    func apply(_ wallpaper: Wallpaper, preserveDynamic: Bool = false, recordHistory: Bool = true) async {
-        guard !isApplying else { return }
+    @discardableResult
+    func apply(_ wallpaper: Wallpaper, preserveDynamic: Bool = false, recordHistory: Bool = true) async -> Bool {
+        guard !isApplying else { return false }
         isApplying = true
         defer { isApplying = false }
         if !preserveDynamic {
@@ -481,7 +505,7 @@ final class AppModel {
         guard !results.isEmpty else {
             errorMessage = target == nil ? L("找不到任何螢幕，桌布沒有套用。") : L("所選螢幕已中斷連線，桌布沒有套用。")
             statusMessage = L("未套用桌布：沒有螢幕。")
-            return
+            return false
         }
         let matched = results.filter { $0.applied && $0.readbackMatched }.count
         let failed = results.filter { !$0.applied }.count
@@ -490,7 +514,8 @@ final class AppModel {
         if failed == 0 && unreadable == 0 {
             statusMessage = L("已設為目前桌布：\(wallpaper.name)（\(results.count) 顆螢幕，讀回相符 \(matched) 顆）。")
             errorMessage = nil
-            if recordHistory && !preserveDynamic { pushHistory(wallpaper.id) }
+            if recordHistory && !preserveDynamic { pushHistory(RotationPlan.entry(wallpaper.id)) }
+            return true
         } else {
             var parts: [String] = []
             if failed > 0 { parts.append(L("\(failed) 顆設定失敗")) }
@@ -499,11 +524,13 @@ final class AppModel {
             errorMessage = L("桌布套用尚未完全確認：\(joined)。")
             statusMessage = L("已嘗試設為目前桌布：\(wallpaper.name)（\(results.count) 顆螢幕，讀回相符 \(matched) 顆）。")
         }
+        return false
     }
 
     /// 每顆螢幕各套一張。成功與否一樣以讀回為準。
-    private func applyPerDisplay(_ assignments: [(UInt32, Wallpaper)]) async {
-        guard !isApplying, !assignments.isEmpty else { return }
+    @discardableResult
+    private func applyPerDisplay(_ assignments: [(UInt32, Wallpaper)], recordHistory: Bool = true) async -> Bool {
+        guard !isApplying, !assignments.isEmpty else { return false }
         isApplying = true
         defer { isApplying = false }
         preferences.set(false, forKey: "dynamic.enabled")
@@ -516,17 +543,19 @@ final class AppModel {
         if !results.isEmpty && ok == results.count {
             statusMessage = L("已在 \(assignments.count) 顆螢幕各換一張（讀回相符 \(ok) 顆）。")
             errorMessage = nil
-            pushHistory(assignments[0].1.id)
+            if recordHistory { pushHistory(RotationPlan.entry(perDisplay: assignments.map { ($0.0, $0.1.id) })) }
+            return true
         } else if results.isEmpty {
             errorMessage = L("找不到任何螢幕，桌布沒有套用。")
         } else {
             errorMessage = L("桌布套用尚未完全確認：讀回相符 \(ok)／\(results.count) 顆。")
         }
+        return false
     }
 
-    private func pushHistory(_ id: String) {
+    private func pushHistory(_ entry: String) {
         var history = preferences.stringArray(forKey: "rotation.history") ?? []
-        if history.last != id { history.append(id) }
+        if history.last != entry { history.append(entry) }
         preferences.set(Array(history.suffix(RotationPlan.historyLimit)), forKey: "rotation.history")
     }
 

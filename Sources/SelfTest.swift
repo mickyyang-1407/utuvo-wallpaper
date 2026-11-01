@@ -506,9 +506,15 @@ enum SelfTest {
             let planOK = RotationPlan.next(pool: ["a", "b", "c"], after: "b", count: 3) == ["c", "a", "b"]
                 && RotationPlan.next(pool: ["a", "b"], after: "gone", count: 1) == ["a"]
                 && RotationPlan.next(pool: [], after: nil, count: 2).isEmpty
-                && RotationPlan.previous(in: ["a", "b", "c"], existing: ["a", "b", "c"])?.id == "b"
-                && RotationPlan.previous(in: ["a", "b", "c"], existing: ["a", "c"])?.id == "a"
+                && RotationPlan.previous(in: ["a", "b", "c"], existing: ["a", "b", "c"])?.entry == "b"
+                && RotationPlan.previous(in: ["a", "b", "c"], existing: ["a", "c"])?.entry == "a"
                 && RotationPlan.previous(in: ["a", "a"], existing: ["a"]) == nil
+            let pairEntry = RotationPlan.entry(perDisplay: [(11, "a;b=c.jpg"), (22, "d.jpg")])
+            let decoded = RotationPlan.decode(pairEntry)
+            let pairOK = decoded.count == 2 && decoded[0].0 == 11 && decoded[0].1 == "a;b=c.jpg" && decoded[1].0 == 22
+                && RotationPlan.decode("x.jpg").first?.0 == nil
+                && RotationPlan.previous(in: [pairEntry, "x.jpg"], existing: ["a;b=c.jpg", "x.jpg"]) == nil
+                && RotationPlan.previous(in: [pairEntry, "x.jpg"], existing: ["a;b=c.jpg", "d.jpg", "x.jpg"])?.entry == pairEntry
             let urlCases: [(String, WallpaperCommand?)] = [
                 ("utuvo-wallpaper://next", .next), ("UTUVO-Wallpaper://Previous", .previous), ("utuvo-wallpaper:favorite", .favorite),
                 ("utuvo-wallpaper://toggle-pause", .togglePause), ("utuvo-wallpaper://delete", nil), ("https://next", nil)]
@@ -516,7 +522,7 @@ enum SelfTest {
             record("捷徑網址：next／previous／favorite／toggle-pause 解析、大小寫不拘、其他網址與未知指令不動作",
                    urlMiss.isEmpty, urlMiss.isEmpty ? "\(urlCases.count) 例" : "\(urlMiss.map(\.0))")
             record("輪換頻率與挑圖：7 種頻率、游標往後挑、圖池少時重複、上一張略過已刪除",
-                   intervalsOK && planOK, "純函式")
+                   intervalsOK && planOK && pairOK, "純函式（含每螢幕紀錄編碼）")
 
             let multiDesktop = FakeDesktop()
             multiDesktop.displays = [11, 22, 33]
@@ -545,6 +551,39 @@ enum SelfTest {
             record("每顆螢幕不同張：暫停時不換、三顆螢幕各一張、15 分鐘內不重換",
                    pausedOK && distinctDisplays && distinctImages && notYet && secondRound,
                    "圖池 \(poolSize) 張；第一輪 \(firstRound.map { "\($0.0 ?? 0):\($0.1)" })")
+
+            multiDesktop.displays = [11, 22]
+            await multiModel.skipToNext(at: t0.addingTimeInterval(930))
+            let pairsOne = Array(multiDesktop.perDisplay.suffix(2))
+            await multiModel.skipToNext(at: t0.addingTimeInterval(940))
+            let beforeBack = multiDesktop.perDisplay.count
+            await multiModel.applyPrevious(at: t0.addingTimeInterval(950))
+            let restored = Array(multiDesktop.perDisplay.dropFirst(beforeBack))
+            multiDesktop.displays = [11, 22, 33]
+            record("每顆螢幕不同張的上一張：逐螢幕還原上一輪的組合",
+                   restored.map { $0.0 } == [11, 22] && restored.map { $0.1 } == pairsOne.map { $0.1 },
+                   "還原 \(restored.map { "\($0.0 ?? 0):\($0.1)" })")
+
+            let failingDesktop = FakeDesktop()
+            failingDesktop.results = []
+            let failModel = AppModel(desktop: failingDesktop, preferences: testDefaults, isBackgroundWorker: true)
+            failModel.rotationPerDisplay = false
+            let historyBefore = testDefaults.stringArray(forKey: "rotation.history") ?? []
+            let cursorBefore = testDefaults.string(forKey: "rotation.lastID")
+            await failModel.skipToNext(at: t0.addingTimeInterval(960))
+            await failModel.applyPrevious(at: t0.addingTimeInterval(961))
+            record("套用失敗不動游標與歷史（下一張、上一張都一樣）",
+                   (testDefaults.stringArray(forKey: "rotation.history") ?? []) == historyBefore
+                   && testDefaults.string(forKey: "rotation.lastID") == cursorBefore,
+                   "假桌面回 0 顆螢幕")
+
+            var held = try? FileLease.acquire(at: LabPaths.deliveryRoot.appendingPathComponent(".desktop-apply.lock"))
+            let lockTaken = held != nil
+            let countBeforeBusy = multiDesktop.appliedURLs.count
+            await multiModel.skipToNext(at: t0.addingTimeInterval(970))
+            let busySkipped = multiDesktop.appliedURLs.count == countBeforeBusy
+            held = nil  // 放掉鎖，後面的案例才能換桌布
+            record("另一方正在換桌布時（GUI／背景互斥）不動作", lockTaken && busySkipped, "持有 .desktop-apply.lock")
 
             multiModel.rotationPerDisplay = false
             await multiModel.skipToNext(at: t0.addingTimeInterval(999))

@@ -156,12 +156,17 @@ struct DynamicSchedule: Sendable {
         let minute = Self.minuteOfDay(date, calendar: calendar)
         let today = starts(on: date, calendar: calendar).sorted { $0.value < $1.value }
         let dayStart = calendar.startOfDay(for: date)
-        if let upcoming = today.first(where: { $0.value > minute }) {
-            return (upcoming.key, dayStart.addingTimeInterval(TimeInterval(upcoming.value * 60)))
+        // 用「幾點幾分」組日期，日光節約那天也不會差一小時。
+        func at(_ minutes: Int, on day: Date) -> Date? {
+            calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day)
         }
-        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return nil }
-        let first = starts(on: tomorrow, calendar: calendar).min { $0.value < $1.value }!
-        return (first.key, tomorrow.addingTimeInterval(TimeInterval(first.value * 60)))
+        if let upcoming = today.first(where: { $0.value > minute }), let date = at(upcoming.value, on: dayStart) {
+            return (upcoming.key, date)
+        }
+        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: dayStart),
+              let first = starts(on: tomorrow, calendar: calendar).min(by: { $0.value < $1.value }),
+              let date = at(first.value, on: tomorrow) else { return nil }
+        return (first.key, date)
     }
 
     static func clock(_ minutes: Int) -> String {

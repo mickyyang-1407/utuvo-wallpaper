@@ -14,8 +14,10 @@ macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 - **Categories.** Pictures are sorted automatically by theme in the sidebar, next to All Wallpapers, Favorites and Dynamic.
 - **Tags and resolution.** Make your own colored tags, and browse by 6K, 5K or 4K.
 - **Select many, clean up fast.** ⌘-click, Shift-click and ⌘A to select, ⌥-click to drop one from the selection; move them to the Trash together, originals included. Pictures in use on a display are never moved.
-- **Rotation.** Rotate through your 6K pictures (or only your favorites) on one display or all of them.
-- **Day and night.** Describe a scene. The app generates a daytime picture, then edits that same picture into dawn, dusk and night, so the camera and layout stay the same and only the light changes. It switches at 06:00, 09:00, 18:00 and 21:00 local time; a 24-hour timeline shows where you are, and a scene library keeps every scene you made.
+- **Rotation.** Rotate through your 6K pictures (or only your favorites) every 5, 15 or 30 minutes, hourly or daily, on one display or all of them — or a different picture on each display. Pause anytime, and go back to the previous wallpaper.
+- **Day and night.** Describe a scene. The app generates a daytime picture, then edits that same picture into dawn, dusk and night, so the camera and layout stay the same and only the light changes. It switches at fixed times (06:00, 09:00, 18:00, 21:00), at your local sunrise and sunset, or with macOS Light/Dark appearance; a 24-hour timeline shows where you are, and a scene library keeps every scene you made.
+- **Menu bar, hotkeys and Shortcuts.** A menu bar icon for next, previous, favorite and pause; global hotkeys ⌃⌥⌘→ / ⌃⌥⌘← / ⌃⌥⌘F / ⌃⌥⌘P; and `utuvo-wallpaper://next` (also `previous`, `favorite`, `pause`, `resume`) for the Shortcuts app’s “Open URL” action.
+- **Language.** English or Traditional Chinese, or follow the system, in Settings.
 - **Runs in the background.** An optional per-user LaunchAgent keeps the daily batch and the time-of-day switching going with the window closed.
 
 New pictures are generated at 3840 × 2160 and saved alongside a 6144 × 3456 version resampled with Core Graphics. That is resampling, not native 6K and not AI upscaling. The originals are kept.
@@ -95,7 +97,7 @@ The self-test uses a temporary folder, a separate preferences suite, a fake imag
 ## Known limits
 
 - Tested on Apple silicon; the Intel build was checked under Rosetta.
-- The day-and-night switching is done by the app's background service. The exported HEIC is a bonus; switching through macOS's own dynamic wallpaper support has not been verified.
+- The day-and-night switching is done by the app's background service. The exported HEIC uses the fixed 06/09/18/21 times and is a bonus; switching through macOS's own dynamic wallpaper support has not been verified.
 - Day-and-night generation runs in the app window, so keep it open until the four pictures are done.
 
 ## License

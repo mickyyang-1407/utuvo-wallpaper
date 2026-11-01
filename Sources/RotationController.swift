@@ -134,13 +134,30 @@ enum RotationPlan {
         return (0..<count).map { pool[(start + $0) % pool.count] }
     }
 
-    /// 歷史最後一筆是目前這張；往前找第一張還存在、而且跟目前不同的。
-    /// `remaining` 是回去之後的新歷史（最後一筆就是回去的那張）。
-    static func previous(in history: [String], existing: Set<String>) -> (id: String, remaining: [String])? {
+    /// 一筆歷史：一張（所有螢幕／指定螢幕同一張）或「每顆螢幕各一張」。
+    /// 每螢幕紀錄以 `@` 開頭，螢幕與圖片用控制字元分隔，不會跟檔名撞。
+    static func entry(_ id: String) -> String { id }
+    static func entry(perDisplay pairs: [(UInt32, String)]) -> String {
+        "@" + pairs.map { "\($0.0)\u{1F}\($0.1)" }.joined(separator: "\u{1E}")
+    }
+    /// 解回 (螢幕, 圖片)；螢幕 nil＝套用到目前選的螢幕。
+    static func decode(_ entry: String) -> [(UInt32?, String)] {
+        guard entry.hasPrefix("@") else { return [(nil, entry)] }
+        return entry.dropFirst().split(separator: "\u{1E}").compactMap { pair in
+            let parts = pair.split(separator: "\u{1F}", maxSplits: 1)
+            guard parts.count == 2, let display = UInt32(parts[0]) else { return nil }
+            return (display, String(parts[1]))
+        }
+    }
+
+    /// 歷史最後一筆是目前這張；往前找第一筆跟目前不同、而且圖都還在的。
+    /// `remaining` 是回去之後的新歷史（最後一筆就是回去的那筆）；呼叫端要等套用成功才寫回。
+    static func previous(in history: [String], existing: Set<String>) -> (entry: String, remaining: [String])? {
         guard let current = history.last else { return nil }
         var rest = Array(history.dropLast())
         while let candidate = rest.last {
-            if candidate != current && existing.contains(candidate) { return (candidate, rest) }
+            let ids = decode(candidate).map(\.1)
+            if candidate != current && !ids.isEmpty && ids.allSatisfy(existing.contains) { return (candidate, rest) }
             rest.removeLast()
         }
         return nil
