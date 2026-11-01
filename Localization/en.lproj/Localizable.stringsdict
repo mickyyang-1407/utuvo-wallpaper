@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld 張</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld picture</string>
+			<key>other</key>
+			<string>%lld pictures</string>
+		</dict>
+	</dict>
+	<key>%lld 張桌布</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld wallpaper</string>
+			<key>other</key>
+			<string>%lld wallpapers</string>
+		</dict>
+	</dict>
+	<key>上次生成：%@ · %lld 張</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Last generated: %1$@ · %2$#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%2$lld picture</string>
+			<key>other</key>
+			<string>%2$lld pictures</string>
+		</dict>
+	</dict>
+	<key>已生成 %lld 張（原生 PNG 與 6K 重採樣都保留）。</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Generated %lld picture (native PNG and 6K resampled versions kept).</string>
+			<key>other</key>
+			<string>Generated %lld pictures (native PNG and 6K resampled versions kept).</string>
+		</dict>
+	</dict>
+	<key>每日自動產生：開始產生 %lld 張。</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Daily generation: creating %lld picture.</string>
+			<key>other</key>
+			<string>Daily generation: creating %lld pictures.</string>
+		</dict>
+	</dict>
+	<key>開始生成 %lld 張桌布。</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Generating %lld wallpaper.</string>
+			<key>other</key>
+			<string>Generating %lld wallpapers.</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

@@ -1,0 +1,8 @@
+{
+  "origin": "ai-upscaled",
+  "originLabel": "AI 放大",
+  "sourceNativeSize": "3840x2160",
+  "outputSize": "5120x2880",
+  "method": "RealESRGAN x2 and Lanczos; JPEG demo copy",
+  "demo": true
+}
