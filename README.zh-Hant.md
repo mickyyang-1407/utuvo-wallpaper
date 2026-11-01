@@ -2,7 +2,7 @@
 
 小巧的 macOS 原生桌布 App。用你自己的 OpenAI API key，每天生成 10 張不同風格的桌布，自動分類，在所有螢幕上輪換；也能把一個場景做成跟著時間從清晨變到夜晚的日夜桌布。
 
-[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.zip) · [English](README.md)
+[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.zip) · [English](README.md)
 
 macOS 14 以上 · Apple Silicon 與 Intel · English／繁體中文 · MIT
 
@@ -12,15 +12,17 @@ macOS 14 以上 · Apple Silicon 與 Intel · English／繁體中文 · MIT
 
 - **每天 10 種風格**：自然、極簡、抽象、插畫、宇宙、水彩、建築、動畫等原創主題。每天最多一批。
 - **分類**：側欄依主題自動分類，另有所有桌布、收藏與動態桌布。
+- **標籤與解析度**：自訂彩色標籤，也能依 6K、5K、4K 瀏覽。
+- **多選、一次整理**：⌘＋點、Shift＋點、⌘A 選取，⌥＋點把一張移出選取；可一起移到垃圾桶（連同原圖），正在當桌布的圖不會被移走。
 - **輪換**：在單一或全部螢幕輪換 6K 成品，也可以只輪換收藏。
-- **日夜桌布**：輸入場景描述，先生成白天，再用同一張圖編修出清晨、黃昏、夜晚，構圖不變、只換光線。依本機時間 06:00、09:00、18:00、21:00 切換。
+- **日夜桌布**：輸入場景描述，先生成白天，再用同一張圖編修出清晨、黃昏、夜晚，構圖不變、只換光線。依本機時間 06:00、09:00、18:00、21:00 切換；24 小時時間軸顯示現在位置，場景庫保留你做過的每個場景。
 - **背景執行**：可選擇啟用使用者層級的 LaunchAgent，關掉視窗後仍會照常每日生成與切換時段。
 
 新圖原生 3840 × 2160，另存一張以 Core Graphics 重採樣的 6144 × 3456。這是重採樣，不是原生 6K，也不是 AI 超解析；原圖會保留。
 
 ## 安裝
 
-1. [下載 DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg)，把 **UTUVO Wallpaper** 拖進「應用程式」。
+1. [下載 DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.dmg)，把 **UTUVO Wallpaper** 拖進「應用程式」。
 2. 從「應用程式」打開。已用 Developer ID 簽章並通過 Apple 公證。
 3. 打開**設定**（⌘,），貼上你的 OpenAI API key。沒有 key 也能瀏覽示範圖。
 4. 想關掉視窗後仍每天生成與切換，到設定開啟背景服務；App 必須在「應用程式」資料夾裡才能開。

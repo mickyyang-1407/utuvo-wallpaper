@@ -2,7 +2,7 @@
 
 A small native macOS wallpaper app. It generates ten wallpapers in ten different styles every day with your own OpenAI API key, sorts them into categories, rotates them across all your displays, and can turn one scene into a day-to-night wallpaper that follows the time of day.
 
-[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.zip) · [繁體中文](README.zh-Hant.md)
+[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.zip) · [繁體中文](README.zh-Hant.md)
 
 macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 
@@ -12,15 +12,17 @@ macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 
 - **Ten styles a day.** Nature, minimal, abstract, illustration, space, watercolor, architecture and animation themes, all original prompts. One batch per day at most.
 - **Categories.** Pictures are sorted automatically by theme in the sidebar, next to All Wallpapers, Favorites and Dynamic.
+- **Tags and resolution.** Make your own colored tags, and browse by 6K, 5K or 4K.
+- **Select many, clean up fast.** ⌘-click, Shift-click and ⌘A to select, ⌥-click to drop one from the selection; move them to the Trash together, originals included. Pictures in use on a display are never moved.
 - **Rotation.** Rotate through your 6K pictures (or only your favorites) on one display or all of them.
-- **Day and night.** Describe a scene. The app generates a daytime picture, then edits that same picture into dawn, dusk and night, so the camera and layout stay the same and only the light changes. It switches at 06:00, 09:00, 18:00 and 21:00 local time.
+- **Day and night.** Describe a scene. The app generates a daytime picture, then edits that same picture into dawn, dusk and night, so the camera and layout stay the same and only the light changes. It switches at 06:00, 09:00, 18:00 and 21:00 local time; a 24-hour timeline shows where you are, and a scene library keeps every scene you made.
 - **Runs in the background.** An optional per-user LaunchAgent keeps the daily batch and the time-of-day switching going with the window closed.
 
 New pictures are generated at 3840 × 2160 and saved alongside a 6144 × 3456 version resampled with Core Graphics. That is resampling, not native 6K and not AI upscaling. The originals are kept.
 
 ## Install
 
-1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.2.0.dmg) and drag **UTUVO Wallpaper** into **Applications**.
+1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.dmg) and drag **UTUVO Wallpaper** into **Applications**.
 2. Open it from Applications. It is signed with a Developer ID and notarized by Apple.
 3. Open **Settings** (⌘,) and paste your OpenAI API key. Without a key you can still browse the demo pictures.
 4. To keep generating and switching with the window closed, turn on the background service in Settings. It only works when the app runs from the Applications folder.
