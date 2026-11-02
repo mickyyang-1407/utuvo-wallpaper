@@ -205,6 +205,48 @@ struct DailyRecipe: Equatable, Sendable {
     }
 }
 
+/// 「AI 靈感」：依分類挑一個主題點子填進 Prompt 欄（本機挑選，不連網、不花額度）。
+enum PromptInspiration {
+    static let ideas: [String: [(zh: String, en: String)]] = [
+        "自然": [("清晨霧氣中的竹林小徑", "a bamboo path in morning mist"), ("冰河湖上漂著藍色浮冰", "blue icebergs drifting on a glacier lake"),
+                ("秋天山谷裡的紅葉與溪流", "red autumn leaves along a valley stream"), ("暴風雨前的金色麥田", "a golden wheat field before a storm"),
+                ("沙漠裡的一棵孤樹與星空", "a lone desert tree under the stars"), ("苔蘚覆蓋的古老森林", "an ancient moss-covered forest"),
+                ("海浪打在黑色礁岩上", "waves crashing on black volcanic rocks")],
+        "極簡": [("一顆紅色氣球飄在灰色天空", "a single red balloon in a grey sky"), ("白色沙丘上的一道影子", "one shadow across white sand dunes"),
+                ("海平線上的一艘小船", "a tiny boat on a flat horizon"), ("霧中的一盞路燈", "one streetlight in fog"),
+                ("雪地裡的一排腳印", "a line of footprints in snow"), ("牆上的一扇藍色窗戶", "a single blue window on a white wall")],
+        "抽象": [("流動的絲綢光帶", "flowing ribbons of silk light"), ("融化的極光色彩", "melting aurora colors"),
+                ("玻璃碎片折射的彩虹", "rainbow light through broken glass"), ("液態金屬的漣漪", "ripples of liquid metal"),
+                ("霓虹色的煙霧漩渦", "a swirl of neon smoke"), ("柔和的色塊互相融合", "soft color fields blending together")],
+        "插畫": [("雨夜的台北巷口小吃攤", "a Taipei alley food stall on a rainy night"), ("屋頂上曬衣服的午後", "an afternoon of laundry drying on rooftops"),
+                ("山城裡的復古電車", "a vintage tram in a hillside town"), ("海邊的小書店", "a tiny bookstore by the sea"),
+                ("夜市裡的燈籠", "lanterns over a night market"), ("貓咪睡在窗台的咖啡館", "a cafe with a cat asleep on the windowsill")],
+        "宇宙": [("土星環上的日出", "sunrise over the rings of Saturn"), ("兩個星系正在碰撞", "two galaxies colliding"),
+                ("太空站窗外的地球", "Earth seen from a space station window"), ("紫色星雲裡誕生的恆星", "stars being born in a violet nebula"),
+                ("月球表面的地球升起", "Earthrise over the lunar surface"), ("黑洞邊緣彎曲的光", "light bending around a black hole")],
+        "水彩": [("威尼斯運河的早晨", "a morning on a Venice canal"), ("薰衣草田裡的石屋", "a stone cottage in lavender fields"),
+                ("下雪的京都寺廟", "a Kyoto temple in snow"), ("港口裡的彩色漁船", "colorful fishing boats in a harbor"),
+                ("夏日海邊的陽傘", "beach umbrellas on a summer shore"), ("櫻花樹下的小橋", "a small bridge under cherry blossoms")],
+        "建築": [("清水模美術館的長廊", "a long concrete museum corridor"), ("螺旋樓梯由上往下看", "a spiral staircase seen from above"),
+                ("玻璃溫室裡的熱帶植物", "tropical plants inside a glass greenhouse"), ("地中海白牆藍門", "Mediterranean white walls and blue doors"),
+                ("夜裡發光的摩天大樓", "a skyscraper glowing at night"), ("老廠房改成的藝廊", "an old factory turned into a gallery")],
+        "動畫": [("夏天的鄉間公車站", "a countryside bus stop in summer"), ("海邊的小火車站", "a little train station by the sea"),
+                ("放學後的教室與夕陽", "an empty classroom at sunset after school"), ("祭典夜晚的煙火", "festival fireworks at night"),
+                ("雲端上的浮空島", "floating islands above the clouds"), ("雨後屋頂上的彩虹", "a rainbow over rooftops after rain")],
+    ]
+
+    /// 依選的分類挑一個（沒選＝全部），盡量不跟目前欄位內容一樣。
+    static func pick(categories: [String], current: String, chinese: Bool,
+                     random: () -> Int = { Int.random(in: 0..<10_000) }) -> String {
+        let keys = categories.isEmpty ? DailyRecipe.categories : categories
+        let pool = keys.flatMap { ideas[$0] ?? [] }.map { chinese ? $0.zh : $0.en }
+        guard !pool.isEmpty else { return current }
+        let fresh = pool.filter { $0 != current }
+        let list = fresh.isEmpty ? pool : fresh
+        return list[random() % list.count]
+    }
+}
+
 /// 一張要生成的圖：用哪個風格、檔名前綴、送出的提示詞。
 struct PlannedPrompt: Codable, Equatable, Sendable {
     var templateID: String

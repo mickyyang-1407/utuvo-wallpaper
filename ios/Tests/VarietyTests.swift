@@ -74,6 +74,15 @@ final class VarietyTests: XCTestCase {
         XCTAssertEqual(DailyRecipe.categories.first, "自然")
     }
 
+    func testInspirationRespectsCategoryAndChangesText() {
+        let current = PromptInspiration.ideas["建築"]![0].zh
+        for _ in 0..<20 {
+            let idea = PromptInspiration.pick(categories: ["建築"], current: current, chinese: true)
+            XCTAssertNotEqual(idea, current)
+            XCTAssertTrue(PromptInspiration.ideas["建築"]!.map(\.zh).contains(idea))
+        }
+    }
+
     func testRecipePersistsInDefaults() {
         let defaults = UserDefaults(suiteName: "test.recipe.\(UUID().uuidString)")!
         DailyRecipe(styles: ["cosmic-nebula", "bogus"], idea: "城市夜景").save(defaults)

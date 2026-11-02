@@ -114,11 +114,22 @@ enum WallpaperPalette {
 /// 視窗底色＋頂部中央淡藍光暈。
 struct CanvasBackground: View {
     @Environment(\.colorScheme) private var scheme
+    /// Liquid Glass 背景：目前選的桌布，大幅模糊後淡淡鋪在底下，玻璃才透得出顏色。
+    var backdrop: NSImage? = nil
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 WallpaperPalette.canvas
+                if #available(macOS 26, *), let backdrop {
+                    Image(nsImage: backdrop)
+                        .resizable().scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .blur(radius: 70)
+                        .opacity(scheme == .dark ? 0.42 : 0.30)
+                        .clipped()
+                        .animation(.easeInOut(duration: 0.4), value: backdrop)
+                }
                 RadialGradient(
                     colors: [WallpaperPalette.glow.opacity(scheme == .dark ? 0.55 : 0.12), .clear],
                     center: UnitPoint(x: 0.5, y: 0),
@@ -204,6 +215,19 @@ struct CardBackground: ViewModifier {
     var selected = false
 
     func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            // Liquid Glass：卡片變玻璃，選取時加品牌藍框。
+            content
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(selected ? WallpaperPalette.accent : Color.clear, lineWidth: 2))
+        } else {
+            solid(content)
+        }
+    }
+
+    private func solid(_ content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -390,5 +414,60 @@ struct NeutralSolidCapsuleStyle: ButtonStyle {
             .background(Capsule().fill(scheme == .dark ? Color.white.opacity(configuration.isPressed ? 0.2 : 0.14)
                                                          : Color.black.opacity(configuration.isPressed ? 0.12 : 0.07)))
             .contentShape(Capsule())
+    }
+}
+
+// MARK: - Liquid Glass 共用元件
+
+/// 文字輸入框：macOS 26 是互動玻璃圓角框，舊系統用標準圓角框。
+struct GlassField: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        } else {
+            content.textFieldStyle(.roundedBorder)
+        }
+    }
+}
+
+/// 下拉選單／小按鈕：macOS 26 用原生玻璃按鈕。
+struct GlassControl: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.buttonStyle(.glass)
+        } else {
+            content
+        }
+    }
+}
+
+/// 側欄、檢視器：macOS 26 讓系統的 Liquid Glass 透出來，舊系統維持原本底色。
+struct PanelBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+        } else {
+            content.background(WallpaperPalette.panel)
+        }
+    }
+}
+
+extension View {
+    func glassField() -> some View { modifier(GlassField()) }
+    func glassControl() -> some View { modifier(GlassControl()) }
+    func panelBackground() -> some View { modifier(PanelBackground()) }
+}
+
+/// 「AI 靈感」按鈕：點一下把主題點子填進旁邊的 Prompt 欄。
+struct InspirationButton: View {
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) { Label("AI 靈感", systemImage: "sparkles").labelStyle(.titleAndIcon) }
+            .help("幫你想一個主題，填進 Prompt 欄")
+            .glassControl()
+            .fixedSize(horizontal: true, vertical: true)
     }
 }

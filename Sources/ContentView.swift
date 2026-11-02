@@ -161,7 +161,7 @@ struct ContentView: View {
                 }
                 statusBar
             }
-            .background(CanvasBackground())
+            .background(CanvasBackground(backdrop: backdropImage))
             .navigationTitle(section?.title ?? L("所有桌布"))
             .searchable(text: $search, placement: .toolbar, prompt: "搜尋桌布")
             .toolbar {
@@ -322,7 +322,7 @@ struct ContentView: View {
             }
             .buttonStyle(.borderless).font(.caption).padding(12)
         }
-        .background(WallpaperPalette.panel)
+        .panelBackground()
     }
 
     private func sidebarRow(_ target: SidebarSelection, title: String, symbol: String, color: Color,
@@ -1047,9 +1047,15 @@ struct ContentView: View {
             }
             .pickerStyle(.segmented).labelsHidden()
             if model.dynamicAutoFrequency == .off {
-                TextField("描述同一個場景", text: $scenePrompt, axis: .vertical)
-                    .lineLimit(2...4)
-                    .textFieldStyle(.roundedBorder)
+                HStack(alignment: .top, spacing: 8) {
+                    TextField("描述同一個場景", text: $scenePrompt, axis: .vertical)
+                        .lineLimit(2...4)
+                        .glassField()
+                    InspirationButton {
+                        scenePrompt = DynamicAutoPlanner.pick(period: UUID().uuidString, season: DynamicAutoPlanner.season(for: Date()),
+                                                              recent: [], chinese: isChineseUI).prompt
+                    }
+                }
             } else {
                 autoSceneInfo
             }
@@ -1187,7 +1193,7 @@ struct ContentView: View {
             }
             .padding(16)
         }
-        .background(WallpaperPalette.panel)
+        .panelBackground()
     }
 
     private func tagPills(for wallpaper: Wallpaper) -> some View {
@@ -1309,13 +1315,20 @@ struct ContentView: View {
             Picker("張數", selection: $model.generateCount) {
                 Text("1 張").tag(1); Text("5 張").tag(5); Text("10 張").tag(10)
             }
+            .glassControl()
             Text("原生 3840 × 2160，另存 6144 × 3456 的 6K 重採樣版本。使用現有 API 憑證。")
                 .font(.caption).foregroundStyle(WallpaperPalette.secondaryText).fixedSize(horizontal: false, vertical: true)
             LabeledContent("分類") { categoryMenu($model.manualRecipe) }
-            TextField("自己的 Prompt（選填）", text: Binding(get: { model.manualRecipe.idea },
-                                                          set: { model.manualRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
-                      prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
-                .lineLimit(2...4).textFieldStyle(.roundedBorder)
+            HStack(alignment: .top, spacing: 8) {
+                TextField("自己的 Prompt（選填）", text: Binding(get: { model.manualRecipe.idea },
+                                                              set: { model.manualRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
+                          prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
+                    .lineLimit(2...4).glassField()
+                InspirationButton {
+                    model.manualRecipe.idea = PromptInspiration.pick(categories: model.manualRecipe.categories,
+                                                                     current: model.manualRecipe.idea, chinese: isChineseUI)
+                }
+            }
             Text(model.manualRecipe.trimmedIdea.isEmpty
                  ? "每張換主題、配色、光線與構圖。"
                  : "每張都畫你的 Prompt，用選的分類輪流表現。")
@@ -1352,10 +1365,16 @@ struct ContentView: View {
                     ForEach(DailyScheduler.Mode.allCases) { Text($0.title).tag($0) }
                 }
                 LabeledContent("分類") { categoryMenu($model.dailyRecipe) }
-                TextField("自己的 Prompt（選填）", text: Binding(get: { model.dailyRecipe.idea },
-                                                     set: { model.dailyRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
-                          prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
-                    .lineLimit(1...3)
+                HStack(alignment: .top, spacing: 8) {
+                    TextField("自己的 Prompt（選填）", text: Binding(get: { model.dailyRecipe.idea },
+                                                         set: { model.dailyRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
+                              prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
+                        .lineLimit(1...3)
+                    InspirationButton {
+                        model.dailyRecipe.idea = PromptInspiration.pick(categories: model.dailyRecipe.categories,
+                                                                        current: model.dailyRecipe.idea, chinese: isChineseUI)
+                    }
+                }
                 Text(model.dailyRecipe.trimmedIdea.isEmpty
                      ? "每天換主題、配色、光線與構圖。"
                      : "每張都畫你的 Prompt，用選的分類輪流表現。")
@@ -1383,8 +1402,18 @@ struct ContentView: View {
             Text(selected.isEmpty ? L("全部分類")
                  : selected.count == 1 ? categoryTitle(selected[0]) : L("\(selected.count) 個分類"))
         }
+        .glassControl()
         .fixedSize()
     }
+
+    /// 背景模糊用的圖：日夜頁用場景的白天圖，其他頁用選取的桌布（小縮圖就夠）。
+    private var backdropImage: NSImage? {
+        let url = isDynamic ? previewedScene.map { $0.directory.appendingPathComponent("day.jpg") } : inspected?.url
+        return url.flatMap { ThumbnailCache.image(for: $0, maxPixel: 320) }
+    }
+
+    /// 介面是不是中文（AI 靈感照介面語言給點子）。
+    private var isChineseUI: Bool { (Bundle.main.preferredLocalizations.first ?? "zh-Hant").hasPrefix("zh") }
 
     private var statusBar: some View {
         HStack {
@@ -1603,7 +1632,7 @@ private struct TagEditor: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(draft.original == nil ? "新增標籤" : "重新命名標籤").font(.headline)
             TextField("標籤名稱", text: $draft.name)
-                .textFieldStyle(.roundedBorder)
+                .glassField()
                 .onSubmit { if !trimmed.isEmpty && !duplicate { onSave(draft) } }
             HStack(spacing: 8) {
                 ForEach(TagStore.palette, id: \.self) { color in
@@ -1789,7 +1818,7 @@ private struct TrashConfirmSheet: View {
         }
         .padding(22)
         .frame(width: 380)
-        .background(WallpaperPalette.panel)
+        .panelBackground()
         .presentationBackground(WallpaperPalette.panel)
     }
 }

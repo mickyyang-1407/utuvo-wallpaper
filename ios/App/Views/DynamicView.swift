@@ -92,10 +92,15 @@ struct DynamicView: View {
                 .tint(Palette.accent)
             }
             if model.dynamicAutoFrequency == .off {
-                TextField(L("例如：湖邊的小木屋與松林"), text: $prompt, axis: .vertical)
-                    .lineLimit(2...4).focused($focused)
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.trackFill))
+                HStack(alignment: .top, spacing: 8) {
+                    TextField(L("例如：湖邊的小木屋與松林"), text: $prompt, axis: .vertical)
+                        .lineLimit(2...4).focused($focused)
+                        .glassField()
+                    InspirationButton {
+                        prompt = DynamicAutoPlanner.pick(period: UUID().uuidString, season: DynamicAutoPlanner.season(for: Date()),
+                                                         recent: [], chinese: isChineseUI).prompt
+                    }
+                }
             } else {
                 Text(model.dynamicAutoFrequency == .daily
                      ? L("AI 每天依季節挑一個新場景，打開 App 時自動生成四時段，完成後直接換上。")

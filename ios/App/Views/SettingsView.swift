@@ -85,6 +85,10 @@ struct SettingsView: View {
                             set: { model.dailyRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
                                   prompt: Text(L("例如：台北的老公寓陽台")), axis: .vertical)
                             .lineLimit(1...3)
+                        InspirationButton {
+                            model.dailyRecipe.idea = PromptInspiration.pick(categories: model.dailyRecipe.categories,
+                                                                            current: model.dailyRecipe.idea, chinese: isChineseUI)
+                        }
                     }
                     if let p = model.dailyProgress {
                         row("calendar", Color(hex: 0x0A84FF)) {

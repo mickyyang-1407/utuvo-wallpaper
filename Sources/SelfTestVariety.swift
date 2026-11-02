@@ -130,6 +130,20 @@ extension SelfTest {
                    "送出 \(prompts.count) 張")
         }
 
+        // AI 靈感：只從選到的分類挑、換一個跟現在不同的；中英照介面語言。
+        let cosmic = PromptInspiration.ideas["宇宙"]!.map(\.zh)
+        var counter = 0
+        let picks = (0..<20).map { _ -> String in
+            counter += 7
+            return PromptInspiration.pick(categories: ["宇宙"], current: cosmic[0], chinese: true, random: { counter })
+        }
+        let englishIdea = PromptInspiration.pick(categories: ["水彩"], current: "", chinese: false)
+        let allCovered = DailyRecipe.categories.allSatisfy { (PromptInspiration.ideas[$0]?.count ?? 0) >= 5 }
+        record("AI 靈感：只挑選到的分類、不重複目前內容、英文介面給英文、每個分類都有點子",
+               picks.allSatisfy { cosmic.contains($0) && $0 != cosmic[0] } && Set(picks).count > 1
+                   && PromptInspiration.ideas["水彩"]!.map(\.en).contains(englishIdea) && allCovered,
+               picks.prefix(3).joined(separator: "／"))
+
         let legacy = DailyPlan.legacy(day: "2026-11-02", count: 10)
         record("舊進度檔沒有計畫：檔名照舊輪替", legacy.map(\.slug) == PromptTemplate.rotated(count: 10).map(\.id), "")
 

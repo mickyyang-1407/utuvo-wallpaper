@@ -393,3 +393,5 @@
 "每張換主題、配色、光線與構圖。" = "Each image changes subject, palette, light and composition.";
 "每張都畫你的 Prompt，用選的分類輪流表現。" = "Every image paints your prompt, rotating through the categories you picked.";
 "自己的 Prompt（選填）" = "Your Prompt (Optional)";
+"AI 靈感" = "AI Idea";
+"幫你想一個主題，填進 Prompt 欄" = "Suggests a subject and fills in the prompt field";

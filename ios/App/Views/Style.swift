@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -33,9 +34,16 @@ extension Color {
 /// 底色＋頂部中央淡藍光暈。
 struct CanvasBackground: View {
     @Environment(\.colorScheme) private var scheme
+    @EnvironmentObject private var model: AppModel
     var body: some View {
         ZStack {
             Palette.canvas
+            // Liquid Glass 背景：最新一張桌布大幅模糊、淡淡鋪底，玻璃才透得出顏色。
+            if #available(iOS 26, *), let url = model.items.first?.url, let image = Backdrop.image(for: url) {
+                Image(uiImage: image).resizable().scaledToFill()
+                    .blur(radius: 60).opacity(scheme == .dark ? 0.45 : 0.30)
+                    .containerRelativeFrame([.horizontal, .vertical]).clipped()
+            }
             RadialGradient(colors: [scheme == .dark ? Color(hex: 0x2A3B5C).opacity(0.25) : Color(hex: 0x3B82F6).opacity(0.10), .clear],
                            center: .top, startRadius: 0, endRadius: 520)
         }
@@ -117,11 +125,51 @@ struct SectionTitle: View {
 struct CardModifier: ViewModifier {
     var radius: CGFloat = 16
     func body(content: Content) -> some View {
-        content
-            .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Palette.cardFill))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Palette.cardStroke, lineWidth: 1))
+        if #available(iOS 26, *) {
+            // Liquid Glass 卡片。
+            content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        } else {
+            content
+                .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Palette.cardFill))
+                .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Palette.cardStroke, lineWidth: 1))
+        }
     }
 }
+
+/// 輸入框：iOS 26 是互動玻璃，舊系統是淡灰底。
+struct GlassFieldModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content.padding(12).glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            content.padding(12).background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.trackFill))
+        }
+    }
+}
+
+extension View {
+    func glassField() -> some View { modifier(GlassFieldModifier()) }
+}
+
+/// 「AI 靈感」：點一下把主題點子填進 Prompt 欄（本機挑選，不連網、不花額度）。
+struct InspirationButton: View {
+    let action: () -> Void
+    var body: some View {
+        if #available(iOS 26, *) {
+            label.buttonStyle(.glass)
+        } else {
+            label.buttonStyle(.bordered)
+        }
+    }
+    private var label: some View {
+        Button(action: action) { Label(L("AI 靈感"), systemImage: "sparkles").labelStyle(.titleAndIcon).font(.subheadline.weight(.semibold)) }
+            .controlSize(.small)
+            .fixedSize(horizontal: true, vertical: true)
+    }
+}
+
+/// 介面是不是中文。
+var isChineseUI: Bool { (Bundle.main.preferredLocalizations.first ?? "zh-Hant").hasPrefix("zh") }
 
 extension View {
     func card(radius: CGFloat = 16) -> some View { modifier(CardModifier(radius: radius)) }
@@ -135,6 +183,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .font(.body.weight(.semibold)).foregroundStyle(.white)
             .padding(.horizontal, 18).padding(.vertical, 11)
             .background(Capsule().fill(LinearGradient(colors: [Palette.blueTop, Palette.blueBottom], startPoint: .top, endPoint: .bottom)))
+            .modifier(PrimaryGlassEdge())
             .opacity(enabled ? (configuration.isPressed ? 0.8 : 1) : 0.4)
     }
 }
@@ -201,5 +250,28 @@ enum DebugLaunch {
         #else
         return false
         #endif
+    }
+}
+
+/// 主要按鈕的玻璃高光（iOS 26）。
+private struct PrimaryGlassEdge: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) { content.glassEffect(.clear.interactive(), in: Capsule()) } else { content }
+    }
+}
+
+/// 背景用的小縮圖（快取）。
+enum Backdrop {
+    nonisolated(unsafe) private static var cache: [URL: UIImage] = [:]
+    static func image(for url: URL) -> UIImage? {
+        if let hit = cache[url] { return hit }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                                                        kCGImageSourceCreateThumbnailWithTransform: true,
+                                                                        kCGImageSourceThumbnailMaxPixelSize: 300] as CFDictionary)
+        else { return nil }
+        let image = UIImage(cgImage: cg)
+        cache[url] = image
+        return image
     }
 }
