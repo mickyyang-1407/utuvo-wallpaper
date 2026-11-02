@@ -653,14 +653,16 @@ final class AppModel {
 
     /// 四時段生成共用流程：拿生成鎖 → 生成 → 發布。回傳是否真的開始。
     @discardableResult
-    private func runSceneGeneration(prompt: String, directory: URL,
+    private func runSceneGeneration(prompt: String, directory: URL, quietWhenBusy: Bool = false,
                                     beforeStart: (() throws -> Void)? = nil,
                                     onSuccess: @escaping @MainActor (GeneratedScene) async -> Void,
                                     onFailure: @escaping @MainActor (Error) -> Void) -> Bool {
         guard !isGenerating else { return false }
         do {
             guard let lease = try FileLease.acquire(at: outputRoot.appendingPathComponent(".generation.lock")) else {
-                errorMessage = L("背景或另一個視窗正在生成，請稍後再試。"); return false
+                // 自動檢查遇到別人在生成：下一分鐘再看，不算錯誤。
+                if !quietWhenBusy { errorMessage = L("背景或另一個視窗正在生成，請稍後再試。") }
+                return false
             }
             let provider = try sceneProviderFactory()
             // 付費請求送出前的最後一步（自動場景在這裡記次數）。
@@ -710,7 +712,7 @@ final class AppModel {
         guard let state = DynamicAutoPlanner.due(state: dynamicAutoState, now: now, frequency: dynamicAutoFrequency,
                                                  southern: context.southern, chinese: context.chinese) else { return }
         guard credentialAvailable() else { return }
-        startAutoScene(state)
+        startAutoScene(state, automatic: true)
     }
 
     /// 「現在用 AI 生成一組」。
@@ -721,11 +723,11 @@ final class AppModel {
                                                  southern: context.southern, chinese: context.chinese))
     }
 
-    private func startAutoScene(_ state: DynamicAutoState) {
+    private func startAutoScene(_ state: DynamicAutoState, automatic: Bool = false) {
         var state = state
         let url = dynamicAutoURL
         let directory = outputRoot.appendingPathComponent("dynamic/scenes/\(state.sceneID)")
-        runSceneGeneration(prompt: state.prompt, directory: directory, beforeStart: {
+        runSceneGeneration(prompt: state.prompt, directory: directory, quietWhenBusy: automatic, beforeStart: {
             state.attempts += 1
             state.retryAfter = nil
             try state.save(to: url)

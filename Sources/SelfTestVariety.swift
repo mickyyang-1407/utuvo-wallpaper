@@ -179,6 +179,23 @@ extension SelfTest {
                offIdle && persisted && state?.completed == true && state?.attempts == 1 && complete && noRepeat && calls == 1,
                "state=\(state?.prompt ?? "nil") complete=\(complete) calls=\(calls)")
 
+        // 別的行程正在生成（拿著生成鎖）：自動檢查安靜跳過，不記次數、不報錯。
+        let busyRoot = tempRoot.appendingPathComponent("auto-busy", isDirectory: true)
+        let busySuite = "selftest.autobusy.\(UUID().uuidString)"
+        let busyDefaults = UserDefaults(suiteName: busySuite)!
+        defer { busyDefaults.removePersistentDomain(forName: busySuite) }
+        try? FileManager.default.createDirectory(at: busyRoot, withIntermediateDirectories: true)
+        let holder = try? FileLease.acquire(at: busyRoot.appendingPathComponent(".generation.lock"))
+        let busyModel = AppModel(desktop: FakeDesktop(), outputRoot: busyRoot, credentialAvailable: { true },
+                                 preferences: busyDefaults, isBackgroundWorker: true)
+        busyModel.sceneProviderFactory = { fixture }
+        busyModel.dynamicAutoFrequency = .daily
+        busyModel.checkDynamicAuto(now: monday)
+        record("AI 自動：別的行程在生成時，背景檢查安靜跳過（不報錯、不記次數）",
+               holder != nil && busyModel.errorMessage == nil && !busyModel.isGenerating && busyModel.dynamicAutoState == nil,
+               "error=\(busyModel.errorMessage ?? "nil")")
+        withExtendedLifetime(holder) {}
+
         let failRoot = tempRoot.appendingPathComponent("auto-fail", isDirectory: true)
         let failSuite = "selftest.autofail.\(UUID().uuidString)"
         let failDefaults = UserDefaults(suiteName: failSuite)!
