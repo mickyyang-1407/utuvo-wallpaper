@@ -72,8 +72,9 @@ final class DayPhaseTests: XCTestCase {
         cal.timeZone = TimeZone(identifier: "Asia/Taipei")!
         let d1 = cal.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 5, minute: 59, second: 59))!
         let d2 = cal.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 6, minute: 0))!
-        XCTAssertEqual(DayPhase.current(at: d1, calendar: cal), .night)
-        XCTAssertEqual(DayPhase.current(at: d2, calendar: cal), .dawn)
+        let fixed = UserDefaults(suiteName: "test.fixed.\(UUID().uuidString)")!  // 不讀 App 的實際設定
+        XCTAssertEqual(DayPhase.current(at: d1, calendar: cal, defaults: fixed), .night)
+        XCTAssertEqual(DayPhase.current(at: d2, calendar: cal, defaults: fixed), .dawn)
     }
 }
 
@@ -222,5 +223,60 @@ final class AppLanguageTests: XCTestCase {
         XCTAssertEqual(AppLanguage.from(languageCode: "zh-Hant-TW"), .traditionalChinese)
         XCTAssertEqual(AppLanguage.from(languageCode: "en-GB"), .english)
         XCTAssertEqual(AppLanguage.from(languageCode: "ja"), .system)
+    }
+}
+
+final class RotationFrequencyTests: XCTestCase {
+    private var cal: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "Asia/Taipei")!; return c }
+    private func at(_ h: Int, _ m: Int) -> Date { cal.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: h, minute: m))! }
+
+    func testSlotsByFrequency() {
+        XCTAssertEqual(WallpaperSelection.slot(at: at(10, 5), frequency: .fifteenMinutes, calendar: cal),
+                       WallpaperSelection.slot(at: at(10, 14), frequency: .fifteenMinutes, calendar: cal))
+        XCTAssertNotEqual(WallpaperSelection.slot(at: at(10, 14), frequency: .fifteenMinutes, calendar: cal),
+                          WallpaperSelection.slot(at: at(10, 15), frequency: .fifteenMinutes, calendar: cal))
+        XCTAssertEqual(WallpaperSelection.slot(at: at(1, 0), frequency: .daily, calendar: cal),
+                       WallpaperSelection.slot(at: at(23, 59), frequency: .daily, calendar: cal))
+        XCTAssertNil(WallpaperSelection.slot(at: at(1, 0), frequency: .everyRun, calendar: cal))
+    }
+
+    func testEveryRunAdvancesEachCallAndPreviousGoesBack() {
+        let ids = ["a", "b", "c"]
+        var state = RotationState()
+        var served: [String] = []
+        for _ in 0..<3 {
+            let r = WallpaperSelection.choose(at: at(10, 0), dynamicPhaseIDs: nil, pinnedID: nil, available: ids, favorites: [],
+                                              favoritesOnly: false, state: state, frequency: .everyRun, calendar: cal)
+            state = r.state; served.append(r.choice!.id)
+        }
+        XCTAssertEqual(Set(served).count, 3)
+        let back = WallpaperSelection.choose(at: at(10, 0), dynamicPhaseIDs: nil, pinnedID: nil, available: ids, favorites: [],
+                                             favoritesOnly: false, state: state, force: true, delta: -1, frequency: .everyRun, calendar: cal)
+        XCTAssertEqual(back.choice?.id, served[1])
+        // 每小時：同一小時不換，下一小時才換
+        let h1 = WallpaperSelection.choose(at: at(10, 0), dynamicPhaseIDs: nil, pinnedID: nil, available: ids, favorites: [],
+                                           favoritesOnly: false, state: RotationState(), calendar: cal)
+        let h2 = WallpaperSelection.choose(at: at(10, 59), dynamicPhaseIDs: nil, pinnedID: nil, available: ids, favorites: [],
+                                           favoritesOnly: false, state: h1.state, calendar: cal)
+        let h3 = WallpaperSelection.choose(at: at(11, 0), dynamicPhaseIDs: nil, pinnedID: nil, available: ids, favorites: [],
+                                           favoritesOnly: false, state: h2.state, calendar: cal)
+        XCTAssertEqual(h1.choice?.id, h2.choice?.id)
+        XCTAssertNotEqual(h2.choice?.id, h3.choice?.id)
+    }
+
+    func testSolarTimingDrivesDayPhaseAndNextSwitch() {
+        let suite = "test.solar.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(DynamicTiming.solar.rawValue, forKey: DynamicTiming.defaultsKey)
+        defaults.set(25.03, forKey: Coordinate.latitudeKey)
+        defaults.set(121.56, forKey: Coordinate.longitudeKey)
+        // 台北 2026-11-02 日出約 06:0x：清晨從日出前 30 分起、日出後 1 小時進白天
+        XCTAssertEqual(DayPhase.current(at: at(5, 50), calendar: cal, defaults: defaults), .dawn)
+        XCTAssertEqual(DayPhase.current(at: at(7, 20), calendar: cal, defaults: defaults), .day)
+        XCTAssertEqual(DayPhase.current(at: at(8, 30), calendar: cal, defaults: UserDefaults(suiteName: "test.fixed.\(UUID().uuidString)")!), .dawn)
+        let next = OverviewFacts.nextPhase(after: at(12, 0), calendar: cal, defaults: defaults)
+        XCTAssertEqual(next.phase, .dusk)
+        XCTAssertTrue(next.time.hasPrefix("16:"), next.time)
     }
 }

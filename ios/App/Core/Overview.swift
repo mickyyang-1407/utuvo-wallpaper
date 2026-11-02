@@ -24,14 +24,14 @@ enum OverviewFacts {
         items.filter { !$0.isDemo && calendar.isDate($0.modified, inSameDayAs: now) }.count
     }
 
-    /// 下一個時段與切換時間。
-    static func nextPhase(after date: Date, calendar: Calendar = .current) -> (phase: DayPhase, time: String) {
-        let hour = calendar.component(.hour, from: date)
-        switch DayPhase.current(hour: hour) {
-        case .dawn: return (.day, DayPhase.day.time)
-        case .day: return (.dusk, DayPhase.dusk.time)
-        case .dusk: return (.night, DayPhase.night.time)
-        case .night: return (.dawn, DayPhase.dawn.time)
+    /// 下一個時段與切換時間（依目前的切換方式）。
+    static func nextPhase(after date: Date, calendar: Calendar = .current, defaults: UserDefaults = .standard) -> (phase: DayPhase, time: String) {
+        let schedule = DynamicSchedule.load(defaults)
+        if let next = schedule.next(after: date, calendar: calendar) {
+            let minutes = calendar.component(.hour, from: next.at) * 60 + calendar.component(.minute, from: next.at)
+            return (next.phase, DynamicSchedule.clock(minutes))
         }
+        let current = schedule.phase(at: date, isDark: false, calendar: calendar)
+        return (current == .night ? .day : .night, "")
     }
 }

@@ -250,7 +250,7 @@ extension SelfTest {
 
         let solar = DynamicSchedule(timing: .solar, coordinate: tpe)
         let solarStarts = solar.starts(on: day(taipei, 2026, 12, 21), calendar: taipei)
-        let solarPhases = [(6, 20, DynamicPhase.dawn), (8, 10, .day), (15, 50, .dusk), (17, 50, .night), (3, 0, .night)]
+        let solarPhases = [(6, 20, DynamicPhase.dawn), (7, 40, .day), (16, 20, .dusk), (17, 50, .night), (3, 0, .night), (15, 50, .day)]
             .allSatisfy { solar.phase(at: day(taipei, 2026, 12, 21, $0.0, $0.1), calendar: taipei) == $0.2 }
         let nextOK = solar.next(after: day(taipei, 2026, 12, 21, 23, 0), calendar: taipei).map {
             $0.phase == .dawn && taipei.component(.day, from: $0.at) == 22 } ?? false

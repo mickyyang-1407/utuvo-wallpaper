@@ -1,6 +1,9 @@
 import Foundation
 
-/// 日夜四時段，切換點與 Mac `DynamicPhase.current` 相同。
+/// 共用的 `DynamicSchedule`（../Sources）用 Mac 的型別名稱。
+typealias DynamicPhase = DayPhase
+
+/// 日夜四時段；切換時間由共用的 `DynamicSchedule` 決定（固定 06／09／18／21 或依日出日落）。
 enum DayPhase: String, CaseIterable, Identifiable, Codable, Sendable {
     case dawn, day, dusk, night
     var id: String { rawValue }
@@ -13,14 +16,8 @@ enum DayPhase: String, CaseIterable, Identifiable, Codable, Sendable {
         case .night: return L("夜晚")
         }
     }
-    var time: String {
-        switch self {
-        case .dawn: return "06:00"
-        case .day: return "09:00"
-        case .dusk: return "18:00"
-        case .night: return "21:00"
-        }
-    }
+    /// 依目前的切換方式顯示今天的開始時間。
+    var time: String { DynamicSchedule.load().startTime(of: self) }
     var symbol: String {
         switch self {
         case .dawn: return "sunrise"
@@ -30,7 +27,7 @@ enum DayPhase: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    /// 純函式：06–09 清晨、09–18 白天、18–21 黃昏，其餘夜晚。
+    /// 固定時間的純函式：06–09 清晨、09–18 白天、18–21 黃昏，其餘夜晚。
     static func current(hour: Int) -> Self {
         switch hour {
         case 6..<9: return .dawn
@@ -40,8 +37,8 @@ enum DayPhase: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    static func current(at date: Date, calendar: Calendar = .current) -> Self {
-        current(hour: calendar.component(.hour, from: date))
+    static func current(at date: Date, calendar: Calendar = .current, defaults: UserDefaults = .standard) -> Self {
+        DynamicSchedule.load(defaults).phase(at: date, isDark: false, calendar: calendar)
     }
 
     /// 白天直接用生成的底圖，其餘三個時段用 edits 換光線。

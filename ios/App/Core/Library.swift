@@ -97,7 +97,7 @@ enum CurrentWallpaper {
                         calendar: Calendar = .current) throws -> URL? {
         let items = WallpaperLibrary.load(paths: paths, bundle: bundle)
         if prefs.dynamicEnabled {
-            let phase = DayPhase.current(at: date, calendar: calendar)
+            let phase = DayPhase.current(at: date, calendar: calendar, defaults: prefs.defaults)
             if let url = try WallpaperLibrary.scenePhaseJPEG(sceneID: prefs.dynamicSceneID, phase: phase,
                                                              paths: paths, target: target, bundle: bundle) { return url }
             // 場景檔不見了：退回一般規則
@@ -114,12 +114,21 @@ enum CurrentWallpaper {
         return try pick(at: date, items: items, prefs: prefs, force: true, paths: paths, target: target, calendar: calendar)
     }
 
-    private static func pick(at date: Date, items: [WallpaperItem], prefs: Preferences, force: Bool,
+    /// 「上一張桌布」：清除釘選、輪換退回一格。
+    static func previous(at date: Date = Date(), paths: AppPaths = .shared, prefs: Preferences = Preferences(),
+                         bundle: Bundle = .main, target: CGSize = DeviceScreen.nativePixels,
+                         calendar: Calendar = .current) throws -> URL? {
+        prefs.pinnedID = nil
+        let items = WallpaperLibrary.load(paths: paths, bundle: bundle)
+        return try pick(at: date, items: items, prefs: prefs, force: true, delta: -1, paths: paths, target: target, calendar: calendar)
+    }
+
+    private static func pick(at date: Date, items: [WallpaperItem], prefs: Preferences, force: Bool, delta: Int = 1,
                              paths: AppPaths, target: CGSize, calendar: Calendar) throws -> URL? {
         let result = WallpaperSelection.choose(
             at: date, dynamicPhaseIDs: nil, pinnedID: prefs.pinnedID, available: items.map(\.id),
             favorites: prefs.favorites, favoritesOnly: prefs.favoritesOnly, state: prefs.rotation,
-            force: force, calendar: calendar)
+            force: force, delta: delta, frequency: prefs.rotationFrequency, calendar: calendar)
         prefs.rotation = result.state
         guard let choice = result.choice, let item = items.first(where: { $0.id == choice.id }) else { return nil }
         return try WallpaperLibrary.deviceJPEG(for: item, paths: paths, target: target)

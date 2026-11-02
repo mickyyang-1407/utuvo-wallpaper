@@ -23,8 +23,9 @@ final class OverviewTests: XCTestCase {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "Asia/Taipei")!
         func at(_ h: Int) -> Date { cal.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: h))! }
-        XCTAssertEqual(OverviewFacts.nextPhase(after: at(7), calendar: cal).phase, .day)
-        XCTAssertEqual(OverviewFacts.nextPhase(after: at(19), calendar: cal).time, "21:00")
-        XCTAssertEqual(OverviewFacts.nextPhase(after: at(2), calendar: cal).phase, .dawn)
+        let fixed = UserDefaults(suiteName: "test.fixed.\(UUID().uuidString)")!  // 不讀 App 的實際設定
+        XCTAssertEqual(OverviewFacts.nextPhase(after: at(7), calendar: cal, defaults: fixed).phase, .day)
+        XCTAssertEqual(OverviewFacts.nextPhase(after: at(19), calendar: cal, defaults: fixed).time, "21:00")
+        XCTAssertEqual(OverviewFacts.nextPhase(after: at(2), calendar: cal, defaults: fixed).phase, .dawn)
     }
 }

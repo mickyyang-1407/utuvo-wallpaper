@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var keyError: String?
     @State private var showGuide = UserDefaults.standard.bool(forKey: "UTUVOOpenGuide")
     @State private var language = AppLanguage.current()
+    @State private var frequency = Preferences().rotationFrequency
+    @State private var timing = DynamicTiming.load() == .solar ? DynamicTiming.solar : .fixed
 
     var body: some View {
         NavigationStack {
@@ -69,8 +71,29 @@ struct SettingsView: View {
                     row(TileStyle.favorites.symbol, TileStyle.favorites.color) {
                         Toggle(L("只輪換收藏"), isOn: $model.favoritesOnly).tint(Palette.green)
                     }
+                    row("arrow.triangle.2.circlepath", Color(hex: 0x30B0C7)) {
+                        Picker(L("換圖頻率"), selection: Binding(get: { frequency }, set: {
+                            frequency = $0; Preferences().rotationFrequency = $0 })) {
+                            ForEach(RotationFrequency.allCases) { Text($0.title).tag($0) }
+                        }
+                    }
+                    row("sun.horizon", Color(hex: 0xFF9F0A)) {
+                        Picker(L("日夜切換"), selection: Binding(get: { timing }, set: {
+                            timing = $0; UserDefaults.standard.set($0.rawValue, forKey: DynamicTiming.defaultsKey) })) {
+                            Text(L("固定時間")).tag(DynamicTiming.fixed)
+                            Text(L("依日出日落")).tag(DynamicTiming.solar)
+                        }
+                    }
                 } footer: {
-                    Text(L("每天最多一批 10 張、10 種不同主題。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。"))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("每天最多一批 10 張、10 種不同主題。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。"))
+                        Text(L("換圖頻率決定捷徑「取得目前桌布」多久換一張。"))
+                        if timing == .solar {
+                            let schedule = DynamicSchedule.load()
+                            Text(L("今天：清晨 \(schedule.startTime(of: .dawn))、白天 \(schedule.startTime(of: .day))、黃昏 \(schedule.startTime(of: .dusk))、夜晚 \(schedule.startTime(of: .night))（依時區推估位置）"))
+                                .monospacedDigit()
+                        }
+                    }
                 }
 
                 Section {
@@ -132,7 +155,10 @@ struct ShortcutsGuideView: View {
          L("點「新增動作」，搜尋「UTUVO Wallpaper」，加入「取得目前桌布」。"),
          L("再搜尋「設定背景圖片」（系統內建動作），把上一步的圖片接進去，選要套用的背景與「主畫面／鎖定畫面」。"),
          L("關掉「顯示預覽」與「裁切至主體」，完成。"),
-         L("想每次都換新的一張，可以把第 3 步改成「下一張桌布」。日夜模式啟用時，請在 06:00、09:00、18:00、21:00 各建一個自動化。")]
+         L("想每次都換新的一張，可以把第 3 步改成「下一張桌布」，或在設定把「換圖頻率」改成「每次執行都換」。"),
+         DynamicTiming.load() == .solar
+            ? L("日夜模式（依日出日落）：建四個自動化，觸發選「日出」或「日落」——日出前 30 分鐘、日出後 1 小時、日落前 1 小時、日落後 30 分鐘。")
+            : L("日夜模式（固定時間）：在 06:00、09:00、18:00、21:00 各建一個自動化。")]
     }
 
     var body: some View {

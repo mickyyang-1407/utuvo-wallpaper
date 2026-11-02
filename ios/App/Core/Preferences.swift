@@ -25,7 +25,11 @@ struct Preferences {
         get { defaults.bool(forKey: "favoritesOnly") }
         nonmutating set { defaults.set(newValue, forKey: "favoritesOnly") }
     }
-    var dailyEnabled: Bool {
+    var rotationFrequency: RotationFrequency {
+        get { defaults.string(forKey: "rotationFrequency").flatMap(RotationFrequency.init(rawValue:)) ?? .hourly }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: "rotationFrequency") }
+    }
+        var dailyEnabled: Bool {
         get { defaults.bool(forKey: "dailyEnabled") }
         nonmutating set { defaults.set(newValue, forKey: "dailyEnabled") }
     }

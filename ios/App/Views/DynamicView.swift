@@ -68,7 +68,7 @@ struct DynamicView: View {
                 }
             }
             .padding(.vertical, 6)
-            Text(L("啟用後，「取得目前桌布」會依時段回傳：06:00 清晨、09:00 白天、18:00 黃昏、21:00 夜晚。"))
+            Text(L("啟用後，「取得目前桌布」會依時段回傳：\(DayPhase.dawn.time) 清晨、\(DayPhase.day.time) 白天、\(DayPhase.dusk.time) 黃昏、\(DayPhase.night.time) 夜晚。"))
                 .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
         }

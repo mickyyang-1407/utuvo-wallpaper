@@ -30,6 +30,18 @@ struct NextWallpaperIntent: AppIntent {
     }
 }
 
+/// 「上一張桌布」：退回輪換一格並回傳圖片。
+struct PreviousWallpaperIntent: AppIntent {
+    static var title: LocalizedStringResource = "上一張桌布"
+    static var description = IntentDescription("回到輪換中的上一張桌布並回傳圖片（會取消釘選）。")
+    static var openAppWhenRun = false
+
+    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
+        guard let url = try CurrentWallpaper.previous() else { throw IntentFailure() }
+        return .result(value: IntentFile(fileURL: url, filename: url.lastPathComponent, type: .jpeg))
+    }
+}
+
 struct WallpaperShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: GetCurrentWallpaperIntent(),
@@ -40,5 +52,9 @@ struct WallpaperShortcuts: AppShortcutsProvider {
                     phrases: ["Next wallpaper in \(.applicationName)",
                               "\(.applicationName)下一張桌布"],
                     shortTitle: "下一張桌布", systemImageName: "forward")
+        AppShortcut(intent: PreviousWallpaperIntent(),
+                    phrases: ["Previous wallpaper in \(.applicationName)",
+                              "\(.applicationName)上一張桌布"],
+                    shortTitle: "上一張桌布", systemImageName: "backward")
     }
 }
