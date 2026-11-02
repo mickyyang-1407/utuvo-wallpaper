@@ -1,6 +1,32 @@
 import Foundation
 import Darwin
 
+/// 主 App 與背景助手（Contents/Helpers/UTUVO Wallpaper Agent.app）。
+/// LaunchAgent 跑助手：主 App 本體在背景跑時，系統會把它當成「已開著的 App」，
+/// 使用者點 App 只會切到那個沒有視窗的程序。
+enum AppBundle {
+    static let agentName = "UTUVO Wallpaper Agent.app"
+
+    /// 主 App；在助手裡執行時往外找三層（Helpers → Contents → .app）。
+    static var host: Bundle {
+        let url = Bundle.main.bundleURL
+        guard url.deletingLastPathComponent().lastPathComponent == "Helpers" else { return .main }
+        return Bundle(url: url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) ?? .main
+    }
+
+    static var isAgent: Bool { Bundle.main.bundleURL.deletingLastPathComponent().lastPathComponent == "Helpers" }
+
+    /// LaunchAgent 要跑的執行檔：有助手就用助手，沒有（舊的開發版）才退回主 App 本體。
+    static func backgroundExecutable(hostBundleURL: URL = host.bundleURL,
+                                     fileManager: FileManager = .default) -> URL? {
+        let agent = hostBundleURL.appendingPathComponent("Contents/Helpers", isDirectory: true)
+            .appendingPathComponent(agentName, isDirectory: true)
+            .appendingPathComponent("Contents/MacOS/WallpaperLab")
+        if fileManager.isExecutableFile(atPath: agent.path) { return agent }
+        return Bundle(url: hostBundleURL)?.executableURL
+    }
+}
+
 /// Per-user LaunchAgent management. Uses the public launchctl commands documented
 /// by launchctl(1); command output is discarded rather than parsed or logged.
 enum BackgroundService {
@@ -93,6 +119,24 @@ enum BackgroundService {
             if failure == nil { failure = BackgroundServiceError.cannotRemovePlist }
         }
         if let failure { throw failure }
+    }
+
+    /// LaunchAgent 目前跑哪個執行檔（讀不到回 nil）。
+    static func registeredExecutablePath() -> String? {
+        guard let data = try? Data(contentsOf: plistURL),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let arguments = plist["ProgramArguments"] as? [String] else { return nil }
+        return arguments.first
+    }
+
+    /// 舊版把 LaunchAgent 指到主 App 本體；已開啟背景時改指到助手並重新載入。回傳是否有改。
+    @discardableResult
+    static func migrateToAgentIfNeeded(defaults: UserDefaults = .standard) -> Bool {
+        guard isEnabled(in: defaults), let expected = AppBundle.backgroundExecutable(),
+              let current = registeredExecutablePath(),
+              current != expected.path, !isTemporaryLocation(expected) else { return false }
+        do { try enable(executableURL: expected, defaults: defaults); return true }
+        catch { return false }
     }
 
     static func isLoaded() -> Bool {

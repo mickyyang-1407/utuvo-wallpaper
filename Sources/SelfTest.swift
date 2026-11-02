@@ -460,6 +460,23 @@ enum SelfTest {
             record("背景註冊：從 DMG／隔離暫存位置執行時拒絕啟用，應用程式資料夾放行",
                    misplaced.isEmpty, misplaced.isEmpty ? "\(placements.count) 例" : "誤判 \(misplaced.keys.sorted())")
 
+            // 背景助手：LaunchAgent 要跑 Helpers 裡的助手，不跑主 App 本體（否則點 App 只會切到背景程序）。
+            let hostApp = tempRoot.appendingPathComponent("Agent Fixture.app", isDirectory: true)
+            let hostExe = hostApp.appendingPathComponent("Contents/MacOS/WallpaperLab")
+            let agentExe = hostApp.appendingPathComponent("Contents/Helpers/\(AppBundle.agentName)/Contents/MacOS/WallpaperLab")
+            try? FileManager.default.createDirectory(at: hostExe.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? Data("<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleExecutable</key><string>WallpaperLab</string><key>CFBundleIdentifier</key><string>com.utuvo.fixture</string></dict></plist>".utf8)
+                .write(to: hostApp.appendingPathComponent("Contents/Info.plist"))
+            FileManager.default.createFile(atPath: hostExe.path, contents: Data(), attributes: [.posixPermissions: 0o755])
+            let withoutAgent = AppBundle.backgroundExecutable(hostBundleURL: hostApp)
+            try? FileManager.default.createDirectory(at: agentExe.deletingLastPathComponent(), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: agentExe.path, contents: Data(), attributes: [.posixPermissions: 0o755])
+            let withAgent = AppBundle.backgroundExecutable(hostBundleURL: hostApp)
+            record("背景註冊：有助手就跑助手，沒有才退回主 App 本體",
+                   withAgent?.standardizedFileURL.path == agentExe.standardizedFileURL.path
+                   && withoutAgent?.resolvingSymlinksInPath().path == hostExe.resolvingSymlinksInPath().path,
+                   "有助手 \(withAgent?.lastPathComponent ?? "nil")／沒有 \(withoutAgent?.path.contains("Helpers") == false)")
+
             let categoryCases = [("nature-dawn-yab2mict-6k.jpg", "自然"), ("botanical-macro-daily-2026-11-01-6k.jpg", "自然"),
                                  ("gradient-tide-yyzw2mck-5k.jpg", "抽象"), ("paper-landscape-5k.png", "極簡"),
                                  ("watercolor-meadow-7y7q8kak-5k.jpg", "水彩"), ("nature-dawnish.jpg", "其他"),

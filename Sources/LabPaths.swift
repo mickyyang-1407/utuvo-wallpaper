@@ -21,13 +21,13 @@ enum LabPaths {
 
     /// Read-only compatibility with the local trial's images. New files always use per-user storage.
     static var adjacentDataRoot: URL? {
-        guard overriddenDirectory == nil, Bundle.main.bundleURL.pathExtension == "app" else { return nil }
-        return Bundle.main.bundleURL.deletingLastPathComponent()
+        guard overriddenDirectory == nil, AppBundle.host.bundleURL.pathExtension == "app" else { return nil }
+        return AppBundle.host.bundleURL.deletingLastPathComponent()
     }
 
     static var bundledDemo: URL? {
         guard overriddenDirectory == nil else { return nil }
-        return Bundle.main.resourceURL?.appendingPathComponent("Demo", isDirectory: true)
+        return AppBundle.host.resourceURL?.appendingPathComponent("Demo", isDirectory: true)
     }
 
     static func scanDirectories() -> [URL] {

@@ -163,7 +163,7 @@ struct WallpaperSettingsView: View {
                     error = GenerationError.missingCredential.localizedDescription
                     return
                 }
-                guard let executable = Bundle.main.executableURL else { return }
+                guard let executable = AppBundle.backgroundExecutable() else { return }
                 // Establish background ownership first, so the GUI cannot claim
                 // today's paid batch while the LaunchAgent is being installed.
                 try BackgroundService.enable(executableURL: executable)

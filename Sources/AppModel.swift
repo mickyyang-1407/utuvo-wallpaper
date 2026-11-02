@@ -91,7 +91,7 @@ final class AppModel {
          preferences: UserDefaults = .standard,
          isBackgroundWorker: Bool = false,
          inUseWallpaperURLs: (@MainActor () -> [URL])? = nil,
-         bundleRoot: URL? = Bundle.main.bundleURL) {
+         bundleRoot: URL? = AppBundle.host.bundleURL) {
         self.preferences = preferences
         self.tagStore = TagStore(root: outputRoot)
         self.inUseWallpaperURLs = inUseWallpaperURLs ?? { AppModel.currentDesktopURLs() }
@@ -594,7 +594,7 @@ final class AppModel {
         guard DynamicSceneEntry.isComplete(sceneDirectory) else { errorMessage = L("四個時段尚未備齊。"); return }
         do {
             if !BackgroundService.isEnabled(in: preferences) {
-                guard let executable = Bundle.main.executableURL else { return }
+                guard let executable = AppBundle.backgroundExecutable() else { return }
                 try BackgroundService.enable(executableURL: executable, defaults: preferences)
             }
             setRotationMode(.off)

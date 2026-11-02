@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var pendingCommands: [WallpaperCommand] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 舊版 LaunchAgent 跑主 App 本體：改指到背景助手（launchctl 在背景執行，不擋視窗）。
+        DispatchQueue.global(qos: .utility).async { BackgroundService.migrateToAgentIfNeeded() }
         let model = AppModel()
         self.model = model
         let content = NSHostingController(rootView: ContentView(model: model))

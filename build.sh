@@ -53,9 +53,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.6.3</string>
+    <string>0.6.4</string>
     <key>CFBundleVersion</key>
-    <string>14</string>
+    <string>15</string>
     <key>LSMinimumSystemVersion</key>
     <string>${DEPLOYMENT_TARGET}</string>
     <key>NSHighResolutionCapable</key>
@@ -111,13 +111,59 @@ for arch in $ARCHS; do
 done
 xcrun lipo -create "${SLICES[@]}" -output "${MACOS_DIR}/${EXECUTABLE}"
 
+# 背景助手：LaunchAgent 跑這份，不跑主 App 本體。主 App 本體一旦在背景執行，系統就把它當成
+# 「已經開著的 UTUVO Wallpaper」，使用者點 App 只會切到這個沒有視窗的程序（Dock 一直跳）。
+# 助手用自己的 bundle id、LSBackgroundOnly，但簽章 identifier 跟主 App 相同，鑰匙圈照樣讀得到。
+AGENT="$APP/Contents/Helpers/UTUVO Wallpaper Agent.app"
+echo "==> 背景助手：$AGENT"
+mkdir -p "$AGENT/Contents/MacOS" "$AGENT/Contents/Resources"
+cp "${MACOS_DIR}/${EXECUTABLE}" "$AGENT/Contents/MacOS/${EXECUTABLE}"
+cp -R "$ROOT/Localization/en.lproj" "$ROOT/Localization/zh-Hant.lproj" "$AGENT/Contents/Resources/"
+SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
+cat > "$AGENT/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>zh-Hant</string>
+    </array>
+    <key>CFBundleExecutable</key>
+    <string>${EXECUTABLE}</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.utuvo.wallpaper-lab.agent</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>UTUVO Wallpaper Agent</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${SHORT_VERSION}</string>
+    <key>CFBundleVersion</key>
+    <string>${BUILD_VERSION}</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>${DEPLOYMENT_TARGET}</string>
+    <key>LSBackgroundOnly</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+
 # SIGN_IDENTITY 指定 Developer ID 時啟用 hardened runtime＋時間戳（公證必要）；預設 ad-hoc。
 if [ -n "${SIGN_IDENTITY:-}" ]; then
     echo "==> 簽章：${SIGN_IDENTITY}（hardened runtime）"
+    codesign --force --options runtime --timestamp --identifier com.utuvo.wallpaper-lab --sign "${SIGN_IDENTITY}" "$AGENT"
     codesign --force --options runtime --timestamp --sign "${SIGN_IDENTITY}" "$APP"
 else
     echo "==> ad-hoc 簽章（不簽 Developer ID、不公證）"
-    codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "   （略過簽章）"
+    { codesign --force --identifier com.utuvo.wallpaper-lab --sign - "$AGENT" &&
+      codesign --force --sign - "$APP"; } >/dev/null 2>&1 || echo "   （略過簽章）"
 fi
 
 echo "==> 完成：$APP"
