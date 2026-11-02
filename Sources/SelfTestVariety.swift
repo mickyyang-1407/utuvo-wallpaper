@@ -96,6 +96,17 @@ extension SelfTest {
         let legacy = DailyPlan.legacy(day: "2026-11-02", count: 10)
         record("舊進度檔沒有計畫：檔名照舊輪替", legacy.map(\.slug) == PromptTemplate.rotated(count: 10).map(\.id), "")
 
+        var snap = BackgroundSnapshot()
+        snap.error = "舊的鎖忙碌錯誤"           // 舊版留下、沒有 batchError
+        snap.recordError(nil, fromBatch: false)
+        let staleCleared = snap.error == nil
+        snap.recordError("批次失敗", fromBatch: true)
+        snap.recordError(nil, fromBatch: false)
+        let batchKept = snap.error == "批次失敗"
+        snap.recordError(nil, fromBatch: true)
+        record("背景狀態：舊錯誤沒再發生就清掉；每日批次失敗保留到下一批",
+               staleCleared && batchKept && snap.error == nil, "")
+
         // MARK: 日夜 AI 自動：排程
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "Asia/Taipei")!

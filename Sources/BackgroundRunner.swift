@@ -8,6 +8,8 @@ struct BackgroundSnapshot: Codable {
     var error: String?
     var lastBatchDate: Date?
     var lastBatchCount = 0
+    /// error 來自每日批次失敗：保留到下一批；其他錯誤下一次正常執行就清掉。
+    var batchError: Bool? = nil
 
     static var url: URL { LabPaths.deliveryRoot.appendingPathComponent("background-status.json") }
 
@@ -19,6 +21,13 @@ struct BackgroundSnapshot: Codable {
         case "需要處理": return L("需要處理")
         default: return stage
         }
+    }
+
+    /// 這一分鐘的錯誤：批次失敗保留到下一批；其他錯誤沒再發生就清掉（不讓舊錯一直顯示需要處理）。
+    mutating func recordError(_ error: String?, fromBatch: Bool) {
+        if fromBatch { self.error = error; batchError = error != nil }
+        else if let error { self.error = error; batchError = false }
+        else if batchError != true { self.error = nil }
     }
 
     static func load() -> Self? {
@@ -61,10 +70,8 @@ enum BackgroundRunner {
                 snapshot.lastBatchCount = model.lastGeneratedCount
                 snapshot.lastBatchDate = Date()
                 snapshot.message = model.statusMessage
-                snapshot.error = model.errorMessage
-            } else if let error = model.errorMessage {
-                snapshot.error = error
             }
+            snapshot.recordError(model.errorMessage, fromBatch: attempted)
             // A fresh process reads the persisted rotation cursor and timestamp.
             // Recording failed readback also spaces out attempts by the interval.
             model.errorMessage = nil
