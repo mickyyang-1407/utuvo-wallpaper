@@ -1,1 +1,2 @@
 a5357ce1b6d6ef607804791a1817d4cb005ea7521b57fc92d420ef499316d024  # Assets/Demo/dynamic/mountain-hours/mountain-hours.heic: bundled demo image, too large for credscan; strings-scanned by hand
+5b8ecb8770e27a575849500096d2c9059b90dbca1387b56eed77148871fb4e87  # docs/assets/hero-en.jpg: 7 random bytes inside JPEG entropy-coded data (after SOS at 425) look like an email; no EXIF/XMP/comment segments
