@@ -406,3 +406,7 @@
 "純色" = "Solid";
 "關閉（Esc）" = "Close (Esc)";
 "預覽" = "Preview";
+"「%@」還沒有桌布" = "No wallpapers in “%@” yet";
+"產生這個分類" = "Generate This Category";
+"用你的 OpenAI API 額度生成。" = "Generated with your OpenAI API credits.";
+"這個分類在本機直接畫，不花 API 額度，幾秒就好。" = "This category is drawn on your Mac — no API credits, done in seconds.";

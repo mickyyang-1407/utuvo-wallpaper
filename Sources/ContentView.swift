@@ -123,9 +123,10 @@ struct ContentView: View {
     private var resolutionTiers: [(ResolutionTier, Int)] {
         ResolutionTier.histogram(widths: model.wallpapers.map(\.pixelWidth))
     }
+    /// 側欄分類：所有分類都列出來（還沒有圖的變淡、數字 0），「其他」只在有圖時出現。
     private var visibleCategories: [String] {
         let present = Set(model.wallpapers.map(\.category))
-        return WallpaperLibrary.categoryOrder.filter { present.contains($0) }
+        return WallpaperLibrary.categoryOrder.filter { $0 != WallpaperLibrary.otherCategory || present.contains($0) }
     }
 
     private var visibleWallpapers: [Wallpaper] {
@@ -354,6 +355,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
+            .opacity(count == 0 && !selected ? 0.5 : 1)
             .modifier(SidebarSelectionBackground(selected: selected))
             .contentShape(RoundedRectangle(cornerRadius: 8))
         }
@@ -406,6 +408,7 @@ struct ContentView: View {
             return CategoryShare(name: name, total: items.count,
                                  today: items.filter { isAddedToday($0, now: now) }.count)
         }
+        .filter { $0.total > 0 }   // 總覽的分布條與「幾個分類」只算有圖的
     }
 
     /// 「下次切換 18:42 黃昏」；跟著淺色／深色時沒有固定時刻。
@@ -425,7 +428,25 @@ struct ContentView: View {
                     }
                 }
                 sectionHeader
-                if visibleWallpapers.isEmpty {
+                if visibleWallpapers.isEmpty, search.isEmpty, let name = selectedCategory, name != WallpaperLibrary.otherCategory {
+                    // 還沒有圖的分類：一鍵帶著這個分類打開「產生桌布」。
+                    ContentUnavailableView {
+                        Label(L("「\(categoryTitle(name))」還沒有桌布"), systemImage: WallpaperPalette.categorySymbol(name))
+                    } description: {
+                        Text(PromptTemplate.shared.contains { $0.category == name && $0.local != nil }
+                             ? "這個分類在本機直接畫，不花 API 額度，幾秒就好。" : "用你的 OpenAI API 額度生成。")
+                    } actions: {
+                        Button("產生這個分類", systemImage: "wand.and.rays") {
+                            var recipe = model.manualRecipe
+                            recipe.styles = []
+                            recipe.setCategory(name, on: true)
+                            model.manualRecipe = recipe
+                            showGeneration = true
+                        }
+                        .buttonStyle(PrimaryCapsuleStyle())
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if visibleWallpapers.isEmpty {
                     ContentUnavailableView(search.isEmpty ? "尚無桌布" : "找不到桌布",
                         systemImage: isFavorites ? "heart" : "photo.on.rectangle",
                         description: Text(isFavorites && search.isEmpty
