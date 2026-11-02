@@ -16,7 +16,18 @@ final class LocationFetcher: NSObject, ObservableObject, CLLocationManagerDelega
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
     }
 
-    func fetch() {
+    /// 已經允許過才更新（不跳權限視窗）：App 打開或進設定時呼叫，讓位置跟著人走。
+    func refreshIfAuthorized() {
+        guard DynamicTiming.load() == .solar else { return }
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            status = .locating
+            manager.requestLocation()
+        default: break
+        }
+    }
+
+        func fetch() {
         status = .locating
         switch manager.authorizationStatus {
         case .notDetermined: manager.requestWhenInUseAuthorization()

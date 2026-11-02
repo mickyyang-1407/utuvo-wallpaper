@@ -162,3 +162,5 @@
 "取不到位置，改用時區推估" = "Couldn’t get location; using time zone";
 "正在取得位置…" = "Getting location…";
 "沒有位置權限，改用時區推估" = "No location access; using time zone";
+"沒有位置權限，沿用上次的位置" = "No location access; using your last location";
+"取不到新位置，沿用上次的位置" = "Couldn’t update location; using your last location";

@@ -144,15 +144,15 @@ struct SettingsView: View {
             .background(CanvasBackground())
             .navigationTitle(L("設定"))
             .navigationDestination(isPresented: $showGuide) { ShortcutsGuideView() }
-            .onAppear { model.reload() }
+            .onAppear { model.reload(); location.refreshIfAuthorized() }
         }
     }
 
     private var locationText: String {
         switch location.status {
         case .locating: return L("正在取得位置…")
-        case .denied: return L("沒有位置權限，改用時區推估")
-        case .failed: return L("取不到位置，改用時區推估")
+        case .denied: return Coordinate.load().fromTimeZone ? L("沒有位置權限，改用時區推估") : L("沒有位置權限，沿用上次的位置")
+        case .failed: return Coordinate.load().fromTimeZone ? L("取不到位置，改用時區推估") : L("取不到新位置，沿用上次的位置")
         default: return Coordinate.load().fromTimeZone ? L("依時區推估位置") : L("使用你的位置")
         }
     }

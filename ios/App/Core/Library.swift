@@ -97,13 +97,24 @@ enum CurrentWallpaper {
                         calendar: Calendar = .current) throws -> URL? {
         let items = WallpaperLibrary.load(paths: paths, bundle: bundle)
         if prefs.dynamicEnabled {
-            // 捷徑的日出／日落或整點觸發可能早個一兩分鐘；往後看 5 分鐘，避免回傳上一個時段。
-            let phase = DayPhase.current(at: date.addingTimeInterval(5 * 60), calendar: calendar, defaults: prefs.defaults)
+            // 依日出日落時，捷徑的觸發與 App 的估算可能差一兩分鐘；往後看 5 分鐘，避免回傳上一個時段。
+            // 固定時間由整點自動化觸發，不需要提早。
+            let phase = DayPhase.current(at: date.addingTimeInterval(lookahead(prefs.defaults)), calendar: calendar, defaults: prefs.defaults)
             if let url = try WallpaperLibrary.scenePhaseJPEG(sceneID: prefs.dynamicSceneID, phase: phase,
-                                                             paths: paths, target: target, bundle: bundle) { return url }
+                                                             paths: paths, target: target, bundle: bundle) {
+                // 記一筆「日夜場景」，「上一張」才知道目前顯示的不是輪換那張。
+                let marker = "dynamic:" + phase.rawValue
+                var history = prefs.servedHistory
+                if history.last != marker { history.append(marker); prefs.servedHistory = history }
+                return url
+            }
             // 場景檔不見了：退回一般規則
         }
         return try pick(at: date, items: items, prefs: prefs, force: false, paths: paths, target: target, calendar: calendar)
+    }
+
+    static func lookahead(_ defaults: UserDefaults) -> TimeInterval {
+        DynamicTiming.load(defaults) == .solar ? 5 * 60 : 0
     }
 
     /// 「下一張桌布」：清除釘選、強制推進輪換一格（不受日夜模式影響）。

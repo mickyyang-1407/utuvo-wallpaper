@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct UTUVOWallpaperApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var location = LocationFetcher()
 
     init() {
         _ = AppLanguage.atLaunch
@@ -17,6 +18,7 @@ struct UTUVOWallpaperApp: App {
                     DeviceScreen.refresh()
                     model.reload()
                     model.runDailyIfNeeded()
+                    location.refreshIfAuthorized()
                     #if DEBUG
                     model.startLiveOneIfRequested()
                     #endif

@@ -307,5 +307,15 @@ final class RotationReviewFixTests: XCTestCase {
         XCTAssertEqual(WallpaperSelection.previous(history: ["a", "pinned", "c"], available: ["a", "pinned", "c"])?.id, "pinned")
         XCTAssertEqual(WallpaperSelection.previous(history: ["a", "gone", "c"], available: ["a", "c"])?.id, "a")
         XCTAssertNil(WallpaperSelection.previous(history: ["c"], available: ["c"]))
+        // 目前顯示的是日夜場景：上一張就是最後一張輪換圖，不會多退一張
+        XCTAssertEqual(WallpaperSelection.previous(history: ["a", "b", "dynamic:day"], available: ["a", "b"])?.id, "b")
+    }
+
+    func testLookaheadOnlyForSunriseSunset() {
+        let fixed = UserDefaults(suiteName: "test.la.\(UUID().uuidString)")!
+        let solar = UserDefaults(suiteName: "test.la.\(UUID().uuidString)")!
+        solar.set(DynamicTiming.solar.rawValue, forKey: DynamicTiming.defaultsKey)
+        XCTAssertEqual(CurrentWallpaper.lookahead(fixed), 0)
+        XCTAssertEqual(CurrentWallpaper.lookahead(solar), 300)
     }
 }
