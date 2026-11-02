@@ -122,16 +122,19 @@ struct CanvasBackground: View {
             ZStack {
                 WallpaperPalette.canvas
                 if #available(macOS 26, *), let backdrop {
+                    // 鮮明霧面：桌布不淡化、只模糊，顏色飽滿地透進玻璃。
                     Image(nsImage: backdrop)
                         .resizable().scaledToFill()
                         .frame(width: geometry.size.width, height: geometry.size.height)
-                        .blur(radius: 70)
-                        .opacity(scheme == .dark ? 0.42 : 0.30)
+                        .blur(radius: 36)
+                        .saturation(1.35)
                         .clipped()
                         .animation(.easeInOut(duration: 0.4), value: backdrop)
+                    // 字要讀得清楚：淺色模式壓一層白、深色模式壓一層黑，讓標題字跟背景拉開對比。
+                    (scheme == .dark ? Color.black.opacity(0.28) : Color.white.opacity(0.30))
                 }
                 RadialGradient(
-                    colors: [WallpaperPalette.glow.opacity(scheme == .dark ? 0.55 : 0.12), .clear],
+                    colors: [WallpaperPalette.glow.opacity(backdrop == nil ? (scheme == .dark ? 0.55 : 0.12) : 0), .clear],
                     center: UnitPoint(x: 0.5, y: 0),
                     startRadius: 0,
                     endRadius: max(geometry.size.width, 600) * 0.6)

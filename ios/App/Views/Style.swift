@@ -40,9 +40,11 @@ struct CanvasBackground: View {
             Palette.canvas
             // Liquid Glass 背景：最新一張桌布大幅模糊、淡淡鋪底，玻璃才透得出顏色。
             if #available(iOS 26, *), let url = model.items.first?.url, let image = Backdrop.image(for: url) {
-                Image(uiImage: image).resizable().scaledToFill()
-                    .blur(radius: 60).opacity(scheme == .dark ? 0.45 : 0.30)
-                    .containerRelativeFrame([.horizontal, .vertical]).clipped()
+                // 鮮明霧面：桌布不淡化、只模糊；再壓一層讓字讀得清楚。
+                Color.clear
+                    .overlay(Image(uiImage: image).resizable().scaledToFill().blur(radius: 30).saturation(1.35))
+                    .clipped()
+                (scheme == .dark ? Color.black.opacity(0.28) : Color.white.opacity(0.30))
             }
             RadialGradient(colors: [scheme == .dark ? Color(hex: 0x2A3B5C).opacity(0.25) : Color(hex: 0x3B82F6).opacity(0.10), .clear],
                            center: .top, startRadius: 0, endRadius: 520)
