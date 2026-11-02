@@ -107,7 +107,6 @@
 "跳到輪換中的下一張桌布並回傳圖片（會取消釘選）。" = "Moves to the next wallpaper in the rotation and returns the image (clears any pin).";
 "輪換全部" = "rotating all";
 "輪換收藏" = "rotating favorites";
-"這個分類還沒有桌布。開啟每日自動生成後會慢慢補齊。" = "No wallpapers in this category yet. Turn on daily generation to fill it in over time.";
 "還沒有收藏。打開一張桌布，點愛心收藏。" = "No favorites yet. Open a wallpaper and tap the heart.";
 "關掉「顯示預覽」與「裁切至主體」，完成。" = "Turn off “Show Preview” and “Crop to Subject”, then tap Done.";
 "黃昏" = "Dusk";
@@ -189,3 +188,19 @@
 "幾何" = "Geometric";
 "漸層" = "Gradient";
 "純色" = "Solid";
+
+"前往設定" = "Open Settings";
+"取消" = "Cancel";
+"另一個生成作業正在進行，請稍後再試。" = "Another generation is running. Try again in a moment.";
+"可以關掉這個面板，生成會繼續。" = "You can close this panel; generation keeps going.";
+"完成" = "Done";
+"完成 %lld 張，已加入圖庫。" = "Done: %lld added to your library.";
+"已產生 %lld／%lld 張" = "%lld of %lld done";
+"張數" = "Count";
+"正在產生桌布" = "Generating wallpapers";
+"每張換主題、配色、光線與構圖；寫了自己的 Prompt 就每張都畫它。純色與漸層在手機上直接畫，免費、不用 API key；其他每張是一次 OpenAI 請求，費用算在你的帳號。" = "Each picture gets a new subject, palette, light and composition; with your own prompt, every picture paints it. Solid colors and gradients are drawn on the phone — free, no API key. Every other picture is one OpenAI request, billed to your account.";
+"產生 %lld 張" = "Generate %lld";
+"產生桌布" = "Generate";
+"產生桌布沒有完成" = "Generation didn't finish";
+"要先在設定存好 OpenAI API key。只選純色或漸層的話不用 key。" = "Save your OpenAI API key in Settings first. Solid colors and gradients alone need no key.";
+"這個分類還沒有桌布。按「產生桌布」馬上畫幾張。" = "No wallpapers in this category yet. Tap Generate to make a few now.";

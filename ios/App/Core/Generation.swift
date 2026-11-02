@@ -74,6 +74,45 @@ struct DailyGenerationService: Sendable {
         return results
     }
 
+    /// 手動「立即產生」：不寫每日進度檔、不佔每天那一批；每次加隨機 salt 換一組主題。
+    /// 每完成一張立刻寫檔，中途失敗已完成的保留。
+    func runManual(count: Int, salt: String = UUID().uuidString,
+                   progress: @Sendable (Int, Int) -> Void = { _, _ in }) async throws -> [GeneratedWallpaper] {
+        guard count > 0 else { throw GenerationError.emptyPrompt }
+        paths.prepare()
+        let plan = DailyPlan.make(day: AppPaths.dayString(now()), count: count, recipe: recipe, salt: salt)
+        var results: [GeneratedWallpaper] = []
+        progress(0, count)
+        for planned in plan {
+            try Task.checkCancellation()
+            let id = RandomID.make()
+            let nativeURL = paths.originals.appendingPathComponent("\(planned.slug)-\(id).png")
+            let wallpaperURL = paths.wallpapers.appendingPathComponent("\(planned.slug)-\(id).jpg")
+            let png: Data
+            if LocalArt.isLocal(planned.prompt) {
+                guard let drawn = LocalArt.render(planned.prompt, width: Int(target.width), height: Int(target.height)) else {
+                    throw GenerationError.decoding
+                }
+                png = drawn
+            } else {
+                png = try await provider.generateImage(prompt: PortraitPrompt.convert(planned.prompt))
+            }
+            guard let size = ImageProcessing.pixelSize(of: png) else { throw GenerationError.decoding }
+            try ImageProcessing.write(png, to: nativeURL)
+            AppPaths.excludeFromBackup(paths.originals)
+            try ImageProcessing.write(try ImageProcessing.cropToJPEG(imageData: png, target: target), to: wallpaperURL)
+            results.append(GeneratedWallpaper(
+                title: planned.title,
+                nativeURL: nativeURL.lastPathComponent,
+                nativePixelSize: CropMath.label(size),
+                wallpaperURL: wallpaperURL.lastPathComponent,
+                wallpaperPixelSize: CropMath.label(target),
+                origin: "resampled"))
+            progress(results.count, count)
+        }
+        return results
+    }
+
     /// 今天是否還有工作可做（未建立、或可續作）。
     static func hasWork(paths: AppPaths, day: String, at date: Date = Date()) -> Bool {
         let url = DailyBatch.url(root: paths.root, day: day)

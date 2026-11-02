@@ -18,6 +18,13 @@ final class AppModel: ObservableObject {
     @Published var publishedScene: SceneRecord?
     /// 每日 10 張的風格與自己的想法；新的一批才生效。
     @Published var dailyRecipe = DailyRecipe() { didSet { dailyRecipe.save(prefs.defaults) } }
+    /// 「立即產生」用的分類與 Prompt（跟每日批次分開存，Mac 同一個前綴）。
+    @Published var manualRecipe = DailyRecipe() { didSet { manualRecipe.save(prefs.defaults, prefix: DailyRecipe.manualPrefix) } }
+    @Published var manualCount = 4 { didSet { prefs.defaults.set(manualCount, forKey: "manual.count") } }
+    @Published var manualProgress: (done: Int, total: Int)?
+    @Published var manualError: String?
+    @Published var manualDone: Int?
+    private var manualTask: Task<Void, Never>?
     /// 日夜 AI 自動：每天／每週自動挑場景生成。
     @Published var dynamicAutoFrequency = DynamicAutoFrequency.off { didSet { dynamicAutoFrequency.save(prefs.defaults) } }
     @Published private(set) var dynamicAutoState: DynamicAutoState?
@@ -47,6 +54,9 @@ final class AppModel: ObservableObject {
         dynamicEnabled = prefs.dynamicEnabled
         dynamicSceneID = prefs.dynamicSceneID
         dailyRecipe = DailyRecipe.load(prefs.defaults)
+        manualRecipe = DailyRecipe.load(prefs.defaults, prefix: DailyRecipe.manualPrefix)
+        let savedCount = prefs.defaults.integer(forKey: "manual.count")
+        manualCount = (1...10).contains(savedCount) ? savedCount : 4
         dynamicAutoFrequency = DynamicAutoFrequency.load(prefs.defaults)
         reload()
     }
@@ -163,6 +173,46 @@ final class AppModel: ObservableObject {
             dailyError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
         }
     }
+
+    // MARK: 立即產生
+
+    /// 純色／漸層不需要 key；其他要先存 key。
+    var manualNeedsKey: Bool { !manualRecipe.isLocalOnly && !keyStored && !keyFromEnvironment }
+
+    func generateNow() {
+        guard manualProgress == nil else { return }
+        let count = min(max(manualCount, 1), 10)
+        manualError = nil
+        manualDone = nil
+        manualProgress = (0, count)
+        let recipe = manualRecipe
+        manualTask = Task {
+            defer { manualProgress = nil; manualTask = nil; reload() }
+            do {
+                let source: ImageProvider = recipe.isLocalOnly ? ((try? provider()) ?? LocalOnlyProvider()) : try provider()
+                let service = DailyGenerationService(provider: source, paths: paths, target: DeviceScreen.nativePixels,
+                                                     recipe: recipe)
+                let results = try await GenerationLease.shared.run {
+                    try await service.runManual(count: count) { done, total in
+                        Task { @MainActor in
+                            guard self.manualProgress != nil else { return }
+                            self.manualProgress = (done, total)
+                            self.items = WallpaperLibrary.load(paths: self.paths)
+                        }
+                    }
+                }
+                manualDone = results.count
+            } catch {
+                if case GenerationError.cooldown = error {
+                    manualError = L("另一個生成作業正在進行，請稍後再試。")
+                } else if !DynamicAutoState.isCancellation(error) {
+                    manualError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
+                }
+            }
+        }
+    }
+
+    func cancelManual() { manualTask?.cancel() }
 
     // MARK: 日夜場景
 

@@ -95,6 +95,51 @@ final class VarietyTests: XCTestCase {
         for name in files { XCTAssertEqual(ImageProcessing.pixelSize(at: paths.wallpapers.appendingPathComponent(name)), target) }
     }
 
+    func testManualGenerateMakesNewSetWithoutTouchingDailyBatch() async throws {
+        let aiStyles = DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id), idea: "")
+        let first = ScriptedProvider([])
+        let made = try await DailyGenerationService(provider: first, paths: paths, target: target, recipe: aiStyles)
+            .runManual(count: 3)
+        let second = ScriptedProvider([])
+        _ = try await DailyGenerationService(provider: second, paths: paths, target: target, recipe: aiStyles)
+            .runManual(count: 3)
+        XCTAssertEqual(made.count, 3)
+        XCTAssertEqual(first.prompts.count, 3)
+        XCTAssertNotEqual(first.prompts, second.prompts, "每按一次換一組")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: DailyBatch.url(root: paths.root, day: "2026-11-02").path))
+        XCTAssertTrue(DailyGenerationService.hasWork(paths: paths, day: AppPaths.dayString(Date())), "不佔每天那一批")
+        let files = try FileManager.default.contentsOfDirectory(atPath: paths.wallpapers.path)
+        XCTAssertEqual(files.count, 6)
+        for name in files {
+            XCTAssertNotEqual(WallpaperCategory.category(forFileName: name), WallpaperCategory.other, name)
+            XCTAssertEqual(ImageProcessing.pixelSize(at: paths.wallpapers.appendingPathComponent(name)), target)
+        }
+    }
+
+    func testManualGenerateHonorsCategoryAndIdea() async throws {
+        let provider = ScriptedProvider([])
+        var recipe = DailyRecipe(idea: "雨夜的便利商店")
+        recipe.setCategory("城市", on: true)
+        _ = try await DailyGenerationService(provider: provider, paths: paths, target: target, recipe: recipe).runManual(count: 2)
+        XCTAssertTrue(provider.prompts.allSatisfy { $0.contains("雨夜的便利商店") && $0.contains("9:16") })
+        let files = try FileManager.default.contentsOfDirectory(atPath: paths.wallpapers.path)
+        XCTAssertTrue(files.allSatisfy { WallpaperCategory.category(forFileName: $0) == "城市" }, "\(files)")
+    }
+
+    func testManualGenerateLocalOnlyNeedsNoAPIAndKeepsDoneOnFailure() async throws {
+        let local = ScriptedProvider([])
+        _ = try await DailyGenerationService(provider: local, paths: paths, target: target,
+                                             recipe: DailyRecipe(styles: ["solid-color", "gradient-soft"])).runManual(count: 2)
+        XCTAssertTrue(local.prompts.isEmpty)
+        let failing = ScriptedProvider([.ok, .fail(.httpStatus(500))])
+        do {
+            _ = try await DailyGenerationService(provider: failing, paths: paths, target: target,
+                                                 recipe: DailyRecipe(styles: ["city"])).runManual(count: 3)
+            XCTFail("第二張應該失敗")
+        } catch {}
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: paths.wallpapers.path).count, 3, "完成的那張保留")
+    }
+
     func testRecipePersistsInDefaults() {
         let defaults = UserDefaults(suiteName: "test.recipe.\(UUID().uuidString)")!
         DailyRecipe(styles: ["cosmic-nebula", "bogus"], idea: "城市夜景").save(defaults)

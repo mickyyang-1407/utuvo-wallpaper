@@ -12,6 +12,7 @@ struct GalleryView: View {
     @State private var selectedID: String?
     @State private var openedInitialDetail = false
     @State private var path: [WallpaperItem] = []
+    @State private var showGenerate = UserDefaults.standard.bool(forKey: "UTUVOOpenGenerate")
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -22,7 +23,7 @@ struct GalleryView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    if filter == .all { overview }
+                    if filter == .all { overview } else { HStack { Spacer(); generateButton } }
                     filterBar
                     SectionTitle(title: filter.title, pill: L("\(shown.count) 張"), color: TileStyle.filter(filter).color)
                     if shown.isEmpty {
@@ -42,6 +43,11 @@ struct GalleryView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: WallpaperItem.self) { WallpaperDetailView(item: $0) }
+            .sheet(isPresented: $showGenerate) {
+                GenerateSheet(openSettings: { tab = .settings })
+                    .presentationDetents([.large])
+                    .presentationBackground(.regularMaterial)
+            }
             .onAppear {
                 if selectedID == nil {
                     selectedID = model.pinnedID
@@ -62,6 +68,7 @@ struct GalleryView: View {
         let segments = OverviewFacts.segments(items: model.items, now: now)
         let total = model.items.count
         return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L("UTUVO Wallpaper 為你準備了")).font(.system(size: 17)).foregroundStyle(.secondary)
                 Text(L("\(total) 張")).font(.system(size: 52, weight: .bold)).monospacedDigit().tracking(-1)
@@ -69,11 +76,33 @@ struct GalleryView: View {
                 Text(facts(now: now)).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
                     .fixedSize(horizontal: false, vertical: true)
             }
+                Spacer(minLength: 8)
+                generateButton
+            }
             distributionBar(segments, total: total)
             Label(L("實心是今天新的，斜線是之前的。點一段可打開該分類。"), systemImage: "hand.point.up.left")
                 .font(.footnote).foregroundStyle(.secondary)
             statusCard(now: now)
         }
+    }
+
+    /// 開「產生桌布」面板；正在看某個分類時預設選那個分類。
+    private var generateButton: some View {
+        Button {
+            if case .category(let name) = filter, DailyRecipe.categories.contains(name), model.manualProgress == nil {
+                model.manualRecipe.styles = []
+                model.manualRecipe.setCategory(name, on: true)
+            }
+            showGenerate = true
+        } label: {
+            if let p = model.manualProgress {
+                Label { Text(verbatim: "\(p.done)／\(p.total)") } icon: { Image(systemName: "hourglass") }.monospacedDigit()
+            } else {
+                Label(L("產生桌布"), systemImage: "sparkles")
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .accessibilityIdentifier("generate")
     }
 
     private func facts(now: Date) -> String {
@@ -126,6 +155,12 @@ struct GalleryView: View {
         if let live = model.liveStatus {
             tone = live.ok ? .good : .warn; symbol = live.ok ? "checkmark" : "exclamationmark"
             title = L("單張實測"); detail = live.text; button = L("設定"); target = .settings
+        } else if let p = model.manualProgress {
+            tone = .info; symbol = "sparkles"; title = L("正在產生桌布")
+            detail = L("已產生 \(p.done)／\(p.total) 張"); button = L("查看"); target = .gallery
+        } else if let error = model.manualError {
+            tone = .warn; symbol = "exclamationmark"; title = L("產生桌布沒有完成"); detail = error
+            button = L("查看"); target = .gallery
         } else if let error = model.dailyError {
             tone = .warn; symbol = "exclamationmark"; title = L("今天的自動生成沒有完成"); detail = error
             button = L("設定"); target = .settings
@@ -157,7 +192,7 @@ struct GalleryView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
-            Button(button) { tab = target }.buttonStyle(SecondaryButtonStyle())
+            Button(button) { if target == tab { showGenerate = true } else { tab = target } }.buttonStyle(SecondaryButtonStyle())
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(color.opacity(0.12)))
@@ -195,7 +230,7 @@ struct GalleryView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             IconTile(symbol: TileStyle.filter(filter).symbol, color: TileStyle.filter(filter).color, size: 44)
-            Text(filter == .favorites ? L("還沒有收藏。打開一張桌布，點愛心收藏。") : L("這個分類還沒有桌布。開啟每日自動生成後會慢慢補齊。"))
+            Text(filter == .favorites ? L("還沒有收藏。打開一張桌布，點愛心收藏。") : L("這個分類還沒有桌布。按「產生桌布」馬上畫幾張。"))
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity).padding(28).card()
