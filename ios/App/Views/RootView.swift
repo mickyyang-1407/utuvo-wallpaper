@@ -31,6 +31,7 @@ struct RootView: View {
                 DeviceScreen.refresh()
                 model.reload()
                 model.runDailyIfNeeded()
+                model.runDynamicAutoIfNeeded()
             } else if phase == .background, model.dailyEnabled {
                 BackgroundScheduler.schedule()
             }
