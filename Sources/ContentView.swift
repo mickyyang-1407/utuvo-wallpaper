@@ -1340,7 +1340,7 @@ struct ContentView: View {
                     .resizable().scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
-                    .padding(.horizontal, 64).padding(.top, 56).padding(.bottom, 80)
+                    .padding(.horizontal, 20).padding(.top, 50).padding(.bottom, 70)
                     .id(wallpaper.id)
                     .transition(.opacity)
             }
@@ -1547,8 +1547,18 @@ struct ContentView: View {
                   let window = event.window, window.isKeyWindow, window.isMainWindow,
                   window.attachedSheet == nil, !(window is NSPanel) else { return event }
             if let text = window.firstResponder as? NSText, !text.string.isEmpty { return event }
-            guard !isDynamic else { return event }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            // 大圖預覽開著：Esc 關預覽、←／→ 換張，其他鍵照舊（不會誤刪、不會清掉選取）。
+            if previewID != nil, flags.isDisjoint(with: [.command, .option, .control, .shift]) {
+                switch event.keyCode {
+                case 53: previewID = nil; return nil
+                case 123: stepPreview(-1); return nil
+                case 124: stepPreview(1); return nil
+                case 51, 117: return nil
+                default: return event
+                }
+            }
+            guard !isDynamic else { return event }
             let order = visibleWallpapers.map(\.id)
             switch event.keyCode {
             case 0 where flags == .command:                       // ⌘A
