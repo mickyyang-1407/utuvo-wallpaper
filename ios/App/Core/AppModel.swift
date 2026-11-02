@@ -233,9 +233,11 @@ final class AppModel: ObservableObject {
             } catch GenerationError.cooldown {
                 return  // 另一個生成在跑（例如每日批次），下次打開再試，不算次數
             } catch {
-                state.recordFailure(retryable: error is CancellationError || DailyBatch.isRetryable(error), now: Date())
+                state.recordFailure(retryable: DynamicAutoState.isRetryable(error), now: Date())
                 try? state.save(to: url)
-                sceneError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
+                if !DynamicAutoState.isCancellation(error) {
+                    sceneError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
+                }
             }
         } catch {
             sceneError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")

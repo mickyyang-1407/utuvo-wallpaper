@@ -50,6 +50,20 @@ struct DynamicAutoState: Codable, Equatable, Sendable {
         else { attempts = Self.maxAttempts }
     }
 
+    /// 取消（關視窗、系統中斷）與暫時性錯誤都算可續作；其他錯誤這一期停。
+    static func isRetryable(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if case GenerationError.cancelled = error { return true }
+        return DailyBatch.isRetryable(error)
+    }
+
+    /// 使用者取消不顯示成錯誤。
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if case GenerationError.cancelled = error { return true }
+        return false
+    }
+
     mutating func recordSuccess() {
         completed = true
         retryAfter = nil

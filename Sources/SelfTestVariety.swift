@@ -128,6 +128,14 @@ extension SelfTest {
         record("AI 自動：雪景只在冬天、避開最近 6 個、英文介面用英文、南半球季節相反",
                summer.allSatisfy { !winterOnly.contains($0) } && avoided && english && southern, "")
 
+        var cancelled = first!
+        cancelled.attempts = 1
+        cancelled.recordFailure(retryable: DynamicAutoState.isRetryable(GenerationError.cancelled), now: monday)
+        record("AI 自動：取消（GenerationError.cancelled）算可續作，不會整期停掉",
+               cancelled.attempts == 1 && cancelled.retryAfter != nil
+                   && DynamicAutoState.isRetryable(CancellationError()) && !DynamicAutoState.isRetryable(GenerationError.httpStatus(400)),
+               "attempts=\(cancelled.attempts)")
+
         // MARK: 日夜 AI 自動：AppModel 接線（假圖片來源）
         let autoRoot = tempRoot.appendingPathComponent("auto-fixture", isDirectory: true)
         let autoSuite = "selftest.auto.\(UUID().uuidString)"

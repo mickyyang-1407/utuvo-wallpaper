@@ -75,6 +75,16 @@ final class VarietyTests: XCTestCase {
         XCTAssertNil(DynamicAutoPlanner.due(state: nil, now: now, frequency: .off, calendar: calendar, chinese: true))
     }
 
+    func testCancelledAutoSceneStaysResumable() {
+        var state = DynamicAutoState(period: "2026-11-02", subject: "harbor", prompt: "p", sceneID: "ai-y")
+        state.attempts = 1
+        state.recordFailure(retryable: DynamicAutoState.isRetryable(GenerationError.cancelled), now: Date())
+        XCTAssertEqual(state.attempts, 1)
+        XCTAssertNotNil(state.retryAfter)
+        XCTAssertTrue(DynamicAutoState.isCancellation(GenerationError.cancelled))
+        XCTAssertFalse(DynamicAutoState.isRetryable(GenerationError.httpStatus(400)))
+    }
+
     func testAutoSceneStateRoundTrip() throws {
         let url = paths.dynamicAutoState
         var state = DynamicAutoState(period: "2026-W45", subject: "lighthouse", prompt: "海岬岩岸上的白色燈塔，秋天，薄霧", sceneID: "ai-x")

@@ -740,9 +740,9 @@ final class AppModel {
                 await self.performBackgroundRotation(at: Date())
             }
         }, onFailure: { error in
-            state.recordFailure(retryable: error is CancellationError || DailyBatch.isRetryable(error), now: Date())
+            state.recordFailure(retryable: DynamicAutoState.isRetryable(error), now: Date())
             try? state.save(to: url)
-            if !(error is CancellationError) {
+            if !DynamicAutoState.isCancellation(error) {
                 self.errorMessage = error.localizedDescription
                 self.statusMessage = L("AI 日夜場景未完成；已完成的時段保留，稍後自動續作。")
             }
