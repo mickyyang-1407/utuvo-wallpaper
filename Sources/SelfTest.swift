@@ -477,6 +477,22 @@ enum SelfTest {
                    && withoutAgent?.resolvingSymlinksInPath().path == hostExe.resolvingSymlinksInPath().path,
                    "有助手 \(withAgent?.lastPathComponent ?? "nil")／沒有 \(withoutAgent?.path.contains("Helpers") == false)")
 
+            let installedApp = URL(fileURLWithPath: "/Users/me/Applications/UTUVO Wallpaper.app")
+            let installedMain = installedApp.appendingPathComponent("Contents/MacOS/WallpaperLab")
+            let installedAgent = installedApp.appendingPathComponent("Contents/Helpers/\(AppBundle.agentName)/Contents/MacOS/WallpaperLab")
+            let devApp = URL(fileURLWithPath: "/Users/me/src/Delivery/UTUVO Wallpaper.app")
+            let migrations = [
+                BackgroundService.needsAgentMigration(registered: installedMain.path, hostExecutable: installedMain, agent: installedAgent),
+                BackgroundService.needsAgentMigration(registered: installedAgent.path, hostExecutable: installedMain, agent: installedAgent),
+                BackgroundService.needsAgentMigration(registered: installedMain.path,
+                                                      hostExecutable: devApp.appendingPathComponent("Contents/MacOS/WallpaperLab"),
+                                                      agent: devApp.appendingPathComponent("Contents/Helpers/\(AppBundle.agentName)/Contents/MacOS/WallpaperLab")),
+                BackgroundService.needsAgentMigration(registered: installedAgent.path,
+                                                      hostExecutable: devApp.appendingPathComponent("Contents/MacOS/WallpaperLab"),
+                                                      agent: devApp.appendingPathComponent("Contents/Helpers/\(AppBundle.agentName)/Contents/MacOS/WallpaperLab"))]
+            record("背景註冊：只把「指著自己主程式」的舊設定改到自己的助手，別處副本打開不搶背景",
+                   migrations == [true, false, false, false], "\(migrations)")
+
             let categoryCases = [("nature-dawn-yab2mict-6k.jpg", "自然"), ("botanical-macro-daily-2026-11-01-6k.jpg", "自然"),
                                  ("gradient-tide-yyzw2mck-5k.jpg", "抽象"), ("paper-landscape-5k.png", "極簡"),
                                  ("watercolor-meadow-7y7q8kak-5k.jpg", "水彩"), ("nature-dawnish.jpg", "其他"),

@@ -129,14 +129,21 @@ enum BackgroundService {
         return arguments.first
     }
 
-    /// 舊版把 LaunchAgent 指到主 App 本體；已開啟背景時改指到助手並重新載入。回傳是否有改。
+    /// 舊版把 LaunchAgent 指到這份 App 的主程式；已開啟背景時改指到同一份 App 的助手並重新載入。
+    /// 只處理「指著自己主程式」這一種：別處的副本（開發版、另一份安裝）打開時不會把背景搶過去。
     @discardableResult
     static func migrateToAgentIfNeeded(defaults: UserDefaults = .standard) -> Bool {
-        guard isEnabled(in: defaults), let expected = AppBundle.backgroundExecutable(),
-              let current = registeredExecutablePath(),
-              current != expected.path, !isTemporaryLocation(expected) else { return false }
+        guard isEnabled(in: defaults), let current = registeredExecutablePath(),
+              let expected = AppBundle.backgroundExecutable(),
+              needsAgentMigration(registered: current, hostExecutable: AppBundle.host.executableURL, agent: expected)
+        else { return false }
         do { try enable(executableURL: expected, defaults: defaults); return true }
         catch { return false }
+    }
+
+    static func needsAgentMigration(registered: String, hostExecutable: URL?, agent: URL) -> Bool {
+        guard let hostExecutable, agent.path.contains("/Contents/Helpers/"), !isTemporaryLocation(agent) else { return false }
+        return URL(fileURLWithPath: registered).standardizedFileURL.path == hostExecutable.standardizedFileURL.path
     }
 
     static func isLoaded() -> Bool {
