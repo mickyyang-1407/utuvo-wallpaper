@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-Hant" data-lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UTUVO Wallpaper — 每天十張新桌布</title>
+<meta name="description" content="Open-source wallpaper app for Mac and iPhone: ten fresh AI wallpapers a day in fifteen categories, day-to-night scenes, free solid colors and gradients, and a Liquid Glass interface. Uses your own OpenAI API key.">
+<meta property="og:title" content="UTUVO Wallpaper">
+<meta property="og:description" content="每天十張新桌布，Mac 和 iPhone 都有。Ten fresh wallpapers a day, on Mac and iPhone. Open source.">
+<meta property="og:image" content="https://mickyyang-1407.github.io/utuvo-wallpaper/assets/hero-en.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f3f0; --bg-2:#ebe9e4; --card:#fbfaf8; --ink:#16171a; --ink-2:#45474d; --ink-3:#787a80;
+    --rule:#dddbd5; --accent:#2f5bd3; --accent-ink:#2448b0; --btn-ink:#f4f3f0;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    --cjk: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", -apple-system, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0f1012; --bg-2:#16171a; --card:#1a1b1f; --ink:#ecedef; --ink-2:#b4b6bc; --ink-3:#83868d;
+          --rule:#2a2c31; --accent:#7ea2ff; --accent-ink:#9db8ff; --btn-ink:#0f1012}
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.65;
+       -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  html[data-lang="zh"] body{font-family:var(--cjk)}
+  html[data-lang="zh"] .en, html[data-lang="en"] .zh{display:none !important}
+  a{color:inherit}
+  img{max-width:100%}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+  .label{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink)}
+  /* nav */
+  nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 90%,transparent);
+      backdrop-filter:saturate(1.2) blur(8px);-webkit-backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--rule)}
+  nav .wrap{display:flex;align-items:center;gap:28px;height:60px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;text-decoration:none;white-space:nowrap}
+  .brand i{width:22px;height:22px;border-radius:6px;background:url(assets/wall-04.jpg) center/cover;display:block;
+           box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .links{display:flex;gap:22px;margin-left:auto;font-size:14.5px}
+  .links a{text-decoration:none;color:var(--ink-2)}
+  .links a:hover{color:var(--ink)}
+  .lang{border:1px solid var(--rule);background:transparent;border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;
+        color:var(--ink-2);cursor:pointer}
+  .lang:hover{border-color:var(--ink-3)}
+  .gh{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-size:14px;font-weight:600;
+      background:var(--ink);color:var(--btn-ink);padding:7px 14px;border-radius:8px}
+  .gh svg{width:16px;height:16px;fill:currentColor}
+  /* hero */
+  .hero{padding:72px 0 40px;text-align:center}
+  h1{font-size:56px;line-height:1.12;margin:14px auto 18px;font-weight:700;letter-spacing:-.02em;max-width:15em}
+  html[data-lang="zh"] h1{letter-spacing:.01em}
+  .lead{font-size:19px;color:var(--ink-2);margin:0 auto 30px;max-width:36em}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center}
+  .btn{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:600;font-size:15.5px;
+       padding:12px 20px;border-radius:10px;border:1px solid var(--ink);transition:transform .15s ease}
+  .btn.primary{background:var(--ink);color:var(--btn-ink)}
+  .btn:hover{transform:translateY(-1px)}
+  .note{font-size:14px;color:var(--ink-3);margin-top:18px}
+  .shot{margin:48px auto 0;max-width:1240px;padding:0 28px}
+  .shot img{display:block;width:100%;height:auto;border-radius:16px;
+            box-shadow:0 1px 0 rgba(0,0,0,.04),0 30px 60px -36px rgba(0,0,0,.45)}
+  /* strip */
+  .strip{padding:56px 0 64px}
+  .strip .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .strip img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--bg-2)}
+  .strip p{font-size:13.5px;color:var(--ink-3);margin:14px 0 0;text-align:center}
+  /* sections */
+  section{padding:80px 0;border-top:1px solid var(--rule)}
+  h2{font-size:34px;line-height:1.22;margin:10px 0 14px;font-weight:700;letter-spacing:-.01em}
+  html[data-lang="zh"] h2{letter-spacing:.01em}
+  .sub{color:var(--ink-2);max-width:40em;margin:0 0 36px}
+  .feature{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:center}
+  .feature.flip{grid-template-columns:1.15fr .85fr}
+  .feature.flip .text{order:2}
+  .feature figure{margin:0}
+  .feature figure img{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--rule)}
+  .feature ul{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+  .feature li{padding-left:18px;position:relative;color:var(--ink-2);font-size:15.5px}
+  .feature li::before{content:"";position:absolute;left:0;top:.72em;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .feature.narrow figure{max-width:520px;justify-self:center}
+  /* categories */
+  .cats{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .cats span{font-size:14px;padding:6px 12px;border:1px solid var(--rule);border-radius:999px;background:var(--card);color:var(--ink-2)}
+  .cats span.free{border-color:var(--accent);color:var(--accent-ink)}
+  /* cards */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:22px 22px 20px}
+  .card h3{font-size:16.5px;margin:0 0 6px}
+  .card p{font-size:14.5px;color:var(--ink-2);margin:0}
+  kbd,code{font-family:var(--mono);font-size:.88em}
+  code{background:var(--bg-2);padding:1px 6px;border-radius:5px}
+  pre{background:var(--bg-2);border:1px solid var(--rule);border-radius:10px;padding:16px 18px;overflow:auto;
+      font-family:var(--mono);font-size:13.5px;line-height:1.6;margin:0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:36px}
+  .two>div{min-width:0}
+  .two h3{font-size:18px;margin:0 0 10px}
+  .two p{color:var(--ink-2);font-size:15.5px;margin:0 0 14px}
+  details{border-top:1px solid var(--rule);padding:14px 0}
+  details:last-of-type{border-bottom:1px solid var(--rule)}
+  summary{cursor:pointer;font-weight:600}
+  details p{color:var(--ink-2);font-size:15.5px;margin:10px 0 0}
+  footer{border-top:1px solid var(--rule);padding:36px 0 48px;font-size:14px;color:var(--ink-3)}
+  footer .wrap{display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between}
+  footer a{color:var(--ink-2)}
+  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}.btn{transition:none}.btn:hover{transform:none}}
+  @media (max-width:900px){
+    .links{display:none}
+    nav .wrap{gap:14px}
+    .lang{margin-left:auto}
+    h1{font-size:38px}
+    .lead{font-size:17px}
+    .hero{padding:48px 0 24px}
+    .shot{padding:0 16px;margin-top:32px}
+    .shot img{border-radius:10px}
+    .strip .grid{grid-template-columns:repeat(3,1fr)}
+    section{padding:56px 0}
+    h2{font-size:27px}
+    .feature,.feature.flip{grid-template-columns:1fr;gap:24px}
+    .feature .text,.feature.flip .text{order:2}
+    .cards,.two{grid-template-columns:1fr}
+    .wrap{padding:0 16px}
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><i aria-hidden="true"></i>UTUVO Wallpaper</a>
+    <div class="links">
+      <a href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
+      <a href="#iphone">iPhone</a>
+      <a href="#key"><span class="zh">API key</span><span class="en">API key</span></a>
+      <a href="#source"><span class="zh">原始碼</span><span class="en">Source</span></a>
+    </div>
+    <button class="lang" id="lang" type="button" aria-label="Switch language"><span class="zh">English</span><span class="en">中文</span></button>
+    <a class="gh" href="https://github.com/mickyyang-1407/utuvo-wallpaper"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="label"><span class="zh">開源 · Mac ＋ iPhone</span><span class="en">Open source · Mac + iPhone</span></div>
+    <h1><span class="zh">每天十張新桌布，<br>不會重複。</span><span class="en">Ten new wallpapers a day.<br>Never the same twice.</span></h1>
+    <p class="lead"><span class="zh">UTUVO Wallpaper 用你自己的 OpenAI API key，每天畫出十張不同主題、光線和構圖的桌布，自動分進 15 個分類、輪播到每一個螢幕；還能把同一個場景做成會跟著時間從早到晚變化的桌布。</span><span class="en">UTUVO Wallpaper uses your own OpenAI API key to paint ten wallpapers a day — new subjects, light and composition each time — sorts them into 15 categories, rotates them across every display, and turns one scene into a wallpaper that follows the day from dawn to night.</span></p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest"><span class="zh">下載 macOS 版</span><span class="en">Download for macOS</span></a>
+      <a class="btn" href="https://github.com/mickyyang-1407/utuvo-wallpaper"><span class="zh">看原始碼</span><span class="en">View the source</span></a>
+    </div>
+    <p class="note"><span class="zh">macOS 14 以上 · Apple silicon 與 Intel · Developer ID 簽章、Apple 公證 · MIT 授權</span><span class="en">macOS 14 or later · Apple silicon and Intel · Developer ID signed and notarized · MIT</span></p>
+  </div>
+  <div class="shot">
+    <img class="zh" src="assets/hero-zh.jpg" width="2800" height="1640" alt="UTUVO Wallpaper 的 Mac 視窗與 iPhone 畫面">
+    <img class="en" src="assets/hero-en.jpg" width="2800" height="1640" alt="UTUVO Wallpaper on a Mac and an iPhone">
+  </div>
+</header>
+
+<div class="strip">
+  <div class="wrap">
+    <div class="grid">
+      <img src="assets/wall-01.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-02.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-03.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-04.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-05.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-06.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-07.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-08.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-09.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-10.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-11.jpg" width="960" height="540" alt="" loading="lazy">
+      <img src="assets/wall-12.jpg" width="960" height="540" alt="" loading="lazy">
+    </div>
+    <p><span class="zh">以上都是這個 App 實際產生的桌布，沒有修圖。</span><span class="en">Every picture above was made by the app itself, untouched.</span></p>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="feature">
+      <div class="text">
+        <div class="label"><span class="zh">產生</span><span class="en">Generate</span></div>
+        <h2><span class="zh">選分類，或寫一句你想要的畫面</span><span class="en">Pick categories, or describe what you want</span></h2>
+        <ul>
+          <li><span class="zh">每天自動一批十張，每個風格都有自己輪替的主題和配色，用完才會重複。</span><span class="en">One batch of ten a day. Each style rotates through its own subjects and palettes and repeats only after using them all.</span></li>
+          <li><span class="zh">想要什麼自己寫；沒靈感就按「AI 靈感」，依你選的分類幫你想一句。</span><span class="en">Write your own prompt, or tap <b>AI Idea</b> for one that fits the categories you picked.</span></li>
+          <li><span class="zh">純色和漸層直接在你的 Mac 上畫，瞬間完成、免費、不用 key。</span><span class="en">Solid colors and gradients are drawn on your Mac — instant, free, no key.</span></li>
+        </ul>
+        <div class="cats" aria-label="Categories">
+          <span class="zh">自然</span><span class="zh">極簡</span><span class="zh">抽象</span><span class="zh">插畫</span><span class="zh">宇宙</span><span class="zh">水彩</span><span class="zh">建築</span><span class="zh">動畫</span><span class="zh">深色</span><span class="zh">幾何</span><span class="zh">城市</span><span class="zh">動物</span><span class="zh">3D</span><span class="zh free">純色 · 免費</span><span class="zh free">漸層 · 免費</span>
+          <span class="en">Nature</span><span class="en">Minimal</span><span class="en">Abstract</span><span class="en">Illustration</span><span class="en">Space</span><span class="en">Watercolor</span><span class="en">Architecture</span><span class="en">Animation</span><span class="en">Dark</span><span class="en">Geometric</span><span class="en">City</span><span class="en">Animals</span><span class="en">3D</span><span class="en free">Solid · free</span><span class="en free">Gradient · free</span>
+        </div>
+      </div>
+      <figure class="narrow">
+        <img class="zh" src="assets/feat-generate-zh.jpg" width="843" height="770" alt="產生桌布的彈出視窗：分類、自己的 Prompt、AI 靈感" loading="lazy">
+        <img class="en" src="assets/feat-generate-en.jpg" width="843" height="770" alt="The Generate popover with categories, your own prompt and AI Idea" loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="feature flip">
+      <div class="text">
+        <div class="label"><span class="zh">預覽</span><span class="en">Preview</span></div>
+        <h2><span class="zh">大圖看清楚，喜歡就直接設成桌布</span><span class="en">See it big, set it right there</span></h2>
+        <ul>
+          <li><span class="zh">點兩下縮圖開大圖，← / → 翻頁，Esc 關閉。</span><span class="en">Double-click a thumbnail for a large preview; ← / → to browse, Esc to close.</span></li>
+          <li><span class="zh">介面是 Liquid Glass：卡片和面板透出你正在看的那張圖。</span><span class="en">A Liquid Glass interface: cards and panels show the picture you are looking at through them.</span></li>
+          <li><span class="zh">每 5 分鐘到每天輪播一次，可以每個螢幕放不同的圖。</span><span class="en">Rotate every 5 minutes up to daily, with a different picture on each display if you like.</span></li>
+        </ul>
+      </div>
+      <figure>
+        <img class="zh" src="assets/feat-preview-zh.jpg" width="1600" height="1058" alt="大圖預覽" loading="lazy">
+        <img class="en" src="assets/feat-preview-en.jpg" width="1600" height="1058" alt="Large preview" loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="feature">
+      <div class="text">
+        <div class="label"><span class="zh">日夜</span><span class="en">Day and night</span></div>
+        <h2><span class="zh">同一個場景，從清晨換到深夜</span><span class="en">One scene, from dawn to night</span></h2>
+        <ul>
+          <li><span class="zh">先畫白天，再用同一張圖改出清晨、黃昏和夜晚，鏡頭和構圖都不動，只有光線在變。</span><span class="en">It paints the daytime picture, then edits that same picture into dawn, dusk and night — same camera, only the light changes.</span></li>
+          <li><span class="zh">依固定時間、你所在地的日出日落，或跟著系統深淺色切換。</span><span class="en">Switches at fixed times, at your local sunrise and sunset, or with macOS Light/Dark.</span></li>
+          <li><span class="zh">打開「AI 自動」，每天或每週自己挑一個合季節的新場景。</span><span class="en">Turn on <b>AI Auto</b> and it picks a seasonal scene by itself, daily or weekly.</span></li>
+        </ul>
+      </div>
+      <figure>
+        <img class="zh" src="assets/feat-dynamic-zh.jpg" width="1600" height="1058" alt="日夜桌布頁面" loading="lazy">
+        <img class="en" src="assets/feat-dynamic-en.jpg" width="1600" height="1058" alt="The Day and Night page" loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="label"><span class="zh">小地方</span><span class="en">Details</span></div>
+    <h2><span class="zh">每天都在用的東西，要順手</span><span class="en">Small things, done properly</span></h2>
+    <div class="cards">
+      <div class="card"><h3><span class="zh">選單列與快捷鍵</span><span class="en">Menu bar and hotkeys</span></h3><p><span class="zh">下一張、上一張、收藏、暫停；<kbd>⌃⌥⌘→</kbd> 這類全域快捷鍵，也能接「捷徑」。</span><span class="en">Next, previous, favorite, pause; global hotkeys like <kbd>⌃⌥⌘→</kbd>, and Shortcuts via URL.</span></p></div>
+      <div class="card"><h3><span class="zh">標籤與解析度</span><span class="en">Tags and resolution</span></h3><p><span class="zh">自己做彩色標籤，依 6K／5K／4K 瀏覽；一次多選、一起丟垃圾桶。</span><span class="en">Your own colored tags, browse by 6K / 5K / 4K, select many and clean up at once.</span></p></div>
+      <div class="card"><h3><span class="zh">關掉視窗也會跑</span><span class="en">Runs with the window closed</span></h3><p><span class="zh">可選的背景服務，負責每天那一批和日夜切換。</span><span class="en">An optional background service keeps the daily batch and day-night switching going.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section id="iphone">
+  <div class="wrap">
+    <div class="feature flip">
+      <div class="text">
+        <div class="label">iPhone</div>
+        <h2><span class="zh">手機也有，直式畫好、裁成你的螢幕</span><span class="en">On iPhone too, painted in portrait</span></h2>
+        <ul>
+          <li><span class="zh">同樣的分類、收藏和日夜場景，iOS 17 以上。</span><span class="en">The same categories, favorites and day-and-night scenes. iOS 17 or later.</span></li>
+          <li><span class="zh">iOS 不讓 App 自己換桌布，所以用「捷徑」的自動化每天幫你換，App 裡有一步一步的說明。</span><span class="en">iOS does not let apps change the wallpaper, so a Shortcuts automation does it; the app walks you through it.</span></li>
+          <li><span class="zh">目前在 TestFlight 測試中，原始碼在 <code>ios/</code>，可以自己用 Xcode 編。</span><span class="en">In TestFlight testing now; the source is in <code>ios/</code> and builds with Xcode.</span></li>
+        </ul>
+      </div>
+      <figure>
+        <img class="zh" src="assets/iphone-zh.png" width="1034" height="700" alt="iPhone 版畫面" loading="lazy">
+        <img class="en" src="assets/iphone-en.png" width="1034" height="700" alt="The iPhone app" loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="key">
+  <div class="wrap">
+    <div class="label"><span class="zh">你的 key、你的資料</span><span class="en">Your key, your data</span></div>
+    <h2><span class="zh">用你自己的 OpenAI API key</span><span class="en">Bring your own OpenAI API key</span></h2>
+    <p class="sub"><span class="zh">畫圖走 OpenAI Images API（<code>gpt-image-2</code>），費用算在你自己的 OpenAI 帳號。一張圖一次請求；一組日夜場景是一次產生加三次修改。沒有 key 也能看內建的示範圖、用純色和漸層。</span><span class="en">Pictures come from the OpenAI Images API (<code>gpt-image-2</code>), billed to your own OpenAI account. One picture is one request; a day-and-night scene is one generation plus three edits. Without a key you can still browse the demo pictures and use solid colors and gradients.</span></p>
+    <details><summary><span class="zh">key 存在哪裡？</span><span class="en">Where is the key kept?</span></summary><p><span class="zh">存在 Mac 的鑰匙圈，只放在記憶體裡用，不寫進記錄、狀態檔、錯誤訊息或圖片資訊。鑰匙圈鎖住時 App 會停下來，不會改去別處找。</span><span class="en">In the Mac Keychain, and only held in memory while used. It never goes into logs, status files, error messages or picture metadata. If the Keychain is locked, the app stops instead of looking elsewhere.</span></p></details>
+    <details><summary><span class="zh">會不會一直花錢？</span><span class="en">Will it keep spending?</span></summary><p><span class="zh">每天最多一批十張。網路斷掉時只補缺的，每個主題最多重試三次。純色和漸層完全不呼叫 API。</span><span class="en">At most one batch of ten a day. If a connection drops it only fills the gaps, with at most three tries per theme. Solid colors and gradients never call the API.</span></p></details>
+    <details><summary><span class="zh">圖放在哪？</span><span class="en">Where do the pictures go?</span></summary><p><span class="zh"><code>~/Library/Application Support/UTUVO Wallpaper</code>，一天約 130 MB（原圖加 6K 版本），不會自動刪。6K 版本是 Core Graphics 重新取樣，不是 AI 放大。</span><span class="en"><code>~/Library/Application Support/UTUVO Wallpaper</code>, about 130 MB a day (originals plus 6K versions), never deleted automatically. The 6K version is Core Graphics resampling, not AI upscaling.</span></p></details>
+  </div>
+</section>
+
+<section id="source">
+  <div class="wrap two">
+    <div>
+      <div class="label"><span class="zh">從原始碼編</span><span class="en">Build from source</span></div>
+      <h3 style="margin-top:12px"><span class="zh">不用任何第三方套件</span><span class="en">No third-party packages</span></h3>
+      <p><span class="zh">只要 macOS 14 以上和 Xcode 或 Command Line Tools。</span><span class="en">You need macOS 14 or later and Xcode or the Command Line Tools.</span></p>
+<pre>git clone https://github.com/mickyyang-1407/utuvo-wallpaper.git
+cd utuvo-wallpaper
+bash build.sh
+open "Delivery/UTUVO Wallpaper.app"</pre>
+    </div>
+    <div>
+      <div class="label"><span class="zh">自己檢查</span><span class="en">Check it yourself</span></div>
+      <h3 style="margin-top:12px"><span class="zh">內建自我測試</span><span class="en">Built-in self-test</span></h3>
+      <p><span class="zh">在暫存資料夾、假的圖片來源和假的桌面上跑，不連網、不動你的桌布。</span><span class="en">Runs in a temporary folder with a fake image provider and a fake desktop — no network, no desktop changes.</span></p>
+<pre>"Delivery/UTUVO Wallpaper.app/Contents/MacOS/WallpaperLab" --self-test</pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span><span class="zh">程式碼 MIT 授權。示範圖與 App 圖示是為這個專案做的原創 AI 作品。</span><span class="en">Code under MIT. The demo pictures and app icon are original AI-generated artwork made for this project.</span></span>
+    <span><span class="zh">作者</span><span class="en">Made by</span> <a href="https://github.com/mickyyang-1407">Micky Yang</a> · <a href="https://utuvo.app">utuvo.app</a></span>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    function set(l) {
+      if (l !== 'zh' && l !== 'en') l = 'zh';
+      root.setAttribute('data-lang', l);
+      root.setAttribute('lang', l === 'zh' ? 'zh-Hant' : 'en');
+      document.title = l === 'zh' ? 'UTUVO Wallpaper — 每天十張新桌布' : 'UTUVO Wallpaper — Ten new wallpapers a day';
+      try { localStorage.setItem('lang', l); } catch (e) {}
+    }
+    var saved = null; try { saved = localStorage.getItem('lang'); } catch (e) {}
+    var q = new URLSearchParams(location.search).get('lang');
+    set(q || saved || ((navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en'));
+    document.getElementById('lang').addEventListener('click', function () {
+      set(root.getAttribute('data-lang') === 'zh' ? 'en' : 'zh');
+    });
+  })();
+</script>
+</body>
+</html>

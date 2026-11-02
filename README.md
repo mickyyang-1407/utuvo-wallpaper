@@ -1,22 +1,26 @@
 # UTUVO Wallpaper
 
-A small native macOS wallpaper app. It generates ten wallpapers in ten different styles every day with your own OpenAI API key, sorts them into categories, rotates them across all your displays, and can turn one scene into a day-to-night wallpaper that follows the time of day.
+A small native macOS wallpaper app with a Liquid Glass interface. It generates ten fresh wallpapers every day with your own OpenAI API key — new subjects, colors, light and composition each day, in the categories you pick or from your own prompt — sorts them into fifteen categories, rotates them across all your displays, and turns one scene into a day-to-night wallpaper that follows the time of day. Solid colors and gradients are drawn right on your Mac, no API key needed.
 
-[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.dmg) · [ZIP](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.zip) · [繁體中文](README.zh-Hant.md)
+[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest) · [繁體中文](README.zh-Hant.md)
 
 macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 
-![UTUVO Wallpaper in English](docs/screenshots/en.png)
+![UTUVO Wallpaper in English](docs/assets/hero-en.jpg)
 
 ## What it does
 
-- **Ten styles a day.** Nature, minimal, abstract, illustration, space, watercolor, architecture and animation themes, all original prompts. One batch per day at most.
-- **Categories.** Pictures are sorted automatically by theme in the sidebar, next to All Wallpapers, Favorites and Dynamic.
+- **Ten fresh wallpapers a day.** Each style rotates through its own subjects and palettes by day, with changing light and composition, so a style never repeats a subject until it has used them all. One batch per day at most.
+- **Fifteen categories.** Nature, minimal, abstract, illustration, space, watercolor, architecture, animation, dark (OLED black), geometric, city, animals and 3D are generated with your key; **solid colors and gradients are drawn locally — instant, free and no key required.**
+- **Your categories, your prompt.** Pick categories for the daily batch and for one-off generations, or write your own prompt and get it painted in each style. Stuck? **AI Idea** fills the prompt with a subject that fits the categories you picked.
+- **Large preview.** Double-click a thumbnail (or click the picture in the inspector) for a big preview; ← / → to browse, Esc to close, set it as your wallpaper right there.
+- **Categories in the sidebar.** Every category is listed; empty ones are dimmed and offer a one-click “Generate This Category”.
 - **Tags and resolution.** Make your own colored tags, and browse by 6K, 5K or 4K.
 - **Select many, clean up fast.** ⌘-click, Shift-click and ⌘A to select, ⌥-click to drop one from the selection; move them to the Trash together, originals included. Pictures in use on a display are never moved.
 - **Rotation.** Rotate through your 6K pictures (or only your favorites) every 5, 15 or 30 minutes, hourly or daily, on one display or all of them — or a different picture on each display. Pause anytime, and go back to the previous wallpaper.
-- **Day and night.** Describe a scene. The app generates a daytime picture, then edits that same picture into dawn, dusk and night, so the camera and layout stay the same and only the light changes. It switches at fixed times (06:00, 09:00, 18:00, 21:00), at your local sunrise and sunset, or with macOS Light/Dark appearance; a 24-hour timeline shows where you are, and a scene library keeps every scene you made.
+- **Day and night.** Describe a scene. The app generates a daytime picture, then edits that same picture into dawn, dusk and night, so the camera and layout stay the same and only the light changes. It switches at fixed times (06:00, 09:00, 18:00, 21:00), at your local sunrise and sunset, or with macOS Light/Dark appearance; a 24-hour timeline shows where you are, and a scene library keeps every scene you made. Turn on **AI Auto** (daily or weekly) and it picks a seasonal scene and builds the four times of day by itself.
 - **Menu bar, hotkeys and Shortcuts.** A menu bar icon for next, previous, favorite and pause; global hotkeys ⌃⌥⌘→ / ⌃⌥⌘← / ⌃⌥⌘F / ⌃⌥⌘P; and `utuvo-wallpaper://next` (also `previous`, `favorite`, `pause`, `resume`) for the Shortcuts app’s “Open URL” action.
+- **Liquid Glass.** On macOS 26 cards, menus and panels are real Liquid Glass over a blurred, saturated copy of the picture you are looking at.
 - **Language.** English or Traditional Chinese, or follow the system, in Settings.
 - **Runs in the background.** An optional per-user LaunchAgent keeps the daily batch and the time-of-day switching going with the window closed.
 
@@ -24,7 +28,7 @@ New pictures are generated at 3840 × 2160 and saved alongside a 6144 × 3456 ve
 
 ## Install
 
-1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest/download/UTUVO-Wallpaper-0.3.0.dmg) and drag **UTUVO Wallpaper** into **Applications**.
+1. [Download the DMG](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest) and drag **UTUVO Wallpaper** into **Applications**.
 2. Open it from Applications. It is signed with a Developer ID and notarized by Apple.
 3. Open **Settings** (⌘,) and paste your OpenAI API key. Without a key you can still browse the demo pictures.
 4. To keep generating and switching with the window closed, turn on the background service in Settings. It only works when the app runs from the Applications folder.
@@ -44,7 +48,7 @@ The build uses `swiftc` directly and signs the app ad hoc. Signed releases are m
 
 ## iPhone
 
-<img src="docs/screenshots/ios-en.png" alt="UTUVO Wallpaper on iPhone" width="300" align="right">
+<img src="docs/assets/iphone-en.png" alt="UTUVO Wallpaper on iPhone" width="620">
 
 The `ios/` folder holds the iPhone version (iOS 17 or later). It has the same ten styles, categories, favorites and day-and-night scenes, generated in portrait and cropped to your screen.
 
@@ -108,4 +112,4 @@ Made by [Micky Yang](https://github.com/mickyyang-1407).
 
 ---
 
-[utuvo.app](https://utuvo.app)
+[utuvo.app](https://utuvo.app) · [Website](https://mickyyang-1407.github.io/utuvo-wallpaper/)
