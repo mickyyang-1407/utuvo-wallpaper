@@ -2,7 +2,7 @@ import Foundation
 
 /// App 內的介面語言選擇（Mac 與 iPhone 共用）。
 /// 寫入本 App 自己的 `AppleLanguages`，下次啟動生效；不動系統語言。
-/// Mac 背景排程與 GUI 同一個 bundle id，所以狀態文字會跟著同一個選擇。
+/// Mac 背景助手啟動時沿用主 App 的 AppleLanguages（AppDefaults.adoptHostLanguage），狀態文字跟著同一個選擇。
 enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     case system
     case traditionalChinese = "zh-Hant"
@@ -23,7 +23,7 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     /// 自己另存一份選擇：iOS 的 App 容器讀不到 persistentDomain，而 AppleLanguages 讀不到時會落到系統全域值。
     static let choiceKey = "UTUVOAppLanguage"
 
-    static func current(defaults: UserDefaults = .standard) -> AppLanguage {
+    static func current(defaults: UserDefaults = AppDefaults.shared) -> AppLanguage {
         AppLanguage(rawValue: defaults.string(forKey: choiceKey) ?? "") ?? .system
     }
 
@@ -33,7 +33,7 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
         return .system
     }
 
-    static func apply(_ language: AppLanguage, defaults: UserDefaults = .standard) {
+    static func apply(_ language: AppLanguage, defaults: UserDefaults = AppDefaults.shared) {
         switch language {
         case .system:
             defaults.removeObject(forKey: defaultsKey)

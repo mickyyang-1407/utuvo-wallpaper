@@ -104,6 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
 let cliArguments = Array(CommandLine.arguments.dropFirst())
 
+// 背景助手：介面語言跟主 App 的選擇（要在第一次查表前）。
+AppDefaults.adoptHostLanguage()
+
 if let mode = CLI.parse(cliArguments) {
     // 背景排程寫給 GUI 顯示的狀態要跟系統語言；其餘 CLI 與自我測試固定繁中原文。
     if case .backgroundTick = mode {} else { Localization.sourceOnly = true }

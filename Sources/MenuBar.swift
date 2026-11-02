@@ -30,8 +30,8 @@ enum WallpaperCommand: String, CaseIterable, Sendable {
 enum MenuBarPreferences {
     static let iconKey = "menuBar.enabled"
     static let hotKeysKey = "hotKeys.enabled"
-    static var showsIcon: Bool { UserDefaults.standard.object(forKey: iconKey) as? Bool ?? true }
-    static var hotKeysEnabled: Bool { UserDefaults.standard.object(forKey: hotKeysKey) as? Bool ?? true }
+    static var showsIcon: Bool { AppDefaults.shared.object(forKey: iconKey) as? Bool ?? true }
+    static var hotKeysEnabled: Bool { AppDefaults.shared.object(forKey: hotKeysKey) as? Bool ?? true }
     static let changed = Notification.Name("com.utuvo.wallpaper-lab.menu-bar-preferences")
 }
 

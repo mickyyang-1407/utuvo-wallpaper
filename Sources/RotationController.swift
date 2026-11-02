@@ -96,7 +96,7 @@ final class DailyScheduler {
     private let attemptKey = "daily.lastAttemptDate"
     private static let modeKey = "daily.mode"
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = AppDefaults.shared) {
         self.defaults = defaults
         self.mode = Mode(rawValue: defaults.integer(forKey: Self.modeKey)) ?? .off
     }

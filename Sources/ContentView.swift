@@ -1339,7 +1339,7 @@ struct ContentView: View {
 
     /// 宣傳截圖用：啟動參數 `-UTUVOShowcase generate|preview|dynamic|schedule` 直接打開該畫面（不帶參數時不做事）。
     private func openScreenshotState() {
-        guard let state = UserDefaults.standard.string(forKey: "UTUVOShowcase") else { return }
+        guard let state = AppDefaults.shared.string(forKey: "UTUVOShowcase") else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             switch state {
             case "generate": showGeneration = true

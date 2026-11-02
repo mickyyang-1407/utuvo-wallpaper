@@ -477,6 +477,12 @@ enum SelfTest {
                    && withoutAgent?.resolvingSymlinksInPath().path == hostExe.resolvingSymlinksInPath().path,
                    "有助手 \(withAgent?.lastPathComponent ?? "nil")／沒有 \(withoutAgent?.path.contains("Helpers") == false)")
 
+            let domains = [AppDefaults.hostDomain(for: "com.utuvo.wallpaper-lab.agent"), AppDefaults.hostDomain(for: "com.utuvo.wallpaper-lab"),
+                           AppDefaults.hostDomain(for: ".agent"), AppDefaults.hostDomain(for: nil)]
+            record("背景助手讀寫主 App 的設定網域；主 App 自己仍用原本的設定",
+                   domains == ["com.utuvo.wallpaper-lab", nil, nil, nil] && AppDefaults.shared === UserDefaults.standard,
+                   "\(domains.map { $0 ?? "nil" })")
+
             let installedApp = URL(fileURLWithPath: "/Users/me/Applications/UTUVO Wallpaper.app")
             let installedMain = installedApp.appendingPathComponent("Contents/MacOS/WallpaperLab")
             let installedAgent = installedApp.appendingPathComponent("Contents/Helpers/\(AppBundle.agentName)/Contents/MacOS/WallpaperLab")

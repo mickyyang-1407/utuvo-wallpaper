@@ -25,6 +25,8 @@ targets:
         group: Shared
       - path: ../Sources/AppLanguage.swift
         group: Shared
+      - path: ../Sources/AppDefaults.swift
+        group: Shared
       - path: ../Sources/DynamicSchedule.swift
         group: Shared
       - path: ../Sources/DynamicAuto.swift

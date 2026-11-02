@@ -169,7 +169,7 @@ struct WallpaperSettingsView: View {
                 try BackgroundService.enable(executableURL: executable)
                 model.setDailyMode(.ten)
                 if !model.isDynamicActive { model.setRotationMode(.hourly) }
-                UserDefaults.standard.synchronize()
+                AppDefaults.shared.synchronize()
                 message = L("已啟用。第一輪會在一分鐘內開始，可以關閉視窗。")
             } else {
                 try BackgroundService.disable()
@@ -184,7 +184,7 @@ struct WallpaperSettingsView: View {
     }
 
     private func savePreference(_ value: Bool, _ key: String) {
-        UserDefaults.standard.set(value, forKey: key)
+        AppDefaults.shared.set(value, forKey: key)
         NotificationCenter.default.post(name: MenuBarPreferences.changed, object: nil)
     }
 

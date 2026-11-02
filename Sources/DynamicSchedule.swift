@@ -17,7 +17,7 @@ enum DynamicTiming: String, CaseIterable, Identifiable, Sendable {
     }
 
     static let defaultsKey = "dynamic.timing"
-    static func load(_ defaults: UserDefaults = .standard) -> DynamicTiming {
+    static func load(_ defaults: UserDefaults = AppDefaults.shared) -> DynamicTiming {
         defaults.string(forKey: defaultsKey).flatMap(DynamicTiming.init(rawValue:)) ?? .fixed
     }
 }
@@ -30,7 +30,7 @@ struct Coordinate: Equatable, Sendable {
     static let longitudeKey = "dynamic.longitude"
 
     /// 使用者存過的位置；沒有就用時區推估。
-    static func load(_ defaults: UserDefaults = .standard, timeZone: TimeZone = .current) -> (Coordinate, fromTimeZone: Bool) {
+    static func load(_ defaults: UserDefaults = AppDefaults.shared, timeZone: TimeZone = .current) -> (Coordinate, fromTimeZone: Bool) {
         if let lat = defaults.object(forKey: latitudeKey) as? Double,
            let lon = defaults.object(forKey: longitudeKey) as? Double,
            (-90...90).contains(lat), (-180...180).contains(lon) {
@@ -39,7 +39,7 @@ struct Coordinate: Equatable, Sendable {
         return (estimate(for: timeZone), true)
     }
 
-    static func save(_ coordinate: Coordinate?, to defaults: UserDefaults = .standard) {
+    static func save(_ coordinate: Coordinate?, to defaults: UserDefaults = AppDefaults.shared) {
         if let coordinate {
             defaults.set(coordinate.latitude, forKey: latitudeKey)
             defaults.set(coordinate.longitude, forKey: longitudeKey)
@@ -110,7 +110,7 @@ struct DynamicSchedule: Sendable {
     var timing: DynamicTiming
     var coordinate: Coordinate
 
-    static func load(_ defaults: UserDefaults = .standard) -> DynamicSchedule {
+    static func load(_ defaults: UserDefaults = AppDefaults.shared) -> DynamicSchedule {
         DynamicSchedule(timing: DynamicTiming.load(defaults), coordinate: Coordinate.load(defaults).0)
     }
 

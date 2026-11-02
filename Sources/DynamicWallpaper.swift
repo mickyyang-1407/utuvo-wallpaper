@@ -40,7 +40,7 @@ enum DynamicPhase: String, CaseIterable, Identifiable {
         return Double((parts.hour ?? 0) * 60 + (parts.minute ?? 0)) / 1440
     }
 
-    static func current(at date: Date, defaults: UserDefaults = .standard) -> Self {
+    static func current(at date: Date, defaults: UserDefaults = AppDefaults.shared) -> Self {
         DynamicSchedule.load(defaults).phase(at: date)
     }
 }

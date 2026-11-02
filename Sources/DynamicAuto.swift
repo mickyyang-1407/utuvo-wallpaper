@@ -6,10 +6,10 @@ enum DynamicAutoFrequency: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     static let key = "dynamic.auto.frequency"
 
-    static func load(_ defaults: UserDefaults = .standard) -> Self {
+    static func load(_ defaults: UserDefaults = AppDefaults.shared) -> Self {
         defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? .off
     }
-    func save(_ defaults: UserDefaults = .standard) { defaults.set(rawValue, forKey: Self.key) }
+    func save(_ defaults: UserDefaults = AppDefaults.shared) { defaults.set(rawValue, forKey: Self.key) }
 
     var title: String {
         switch self {

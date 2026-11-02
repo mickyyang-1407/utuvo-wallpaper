@@ -51,8 +51,8 @@ struct DynamicTimingControls: View {
 
     private func setTiming(_ value: DynamicTiming) {
         timing = value
-        UserDefaults.standard.set(value.rawValue, forKey: DynamicTiming.defaultsKey)
-        UserDefaults.standard.synchronize()
+        AppDefaults.shared.set(value.rawValue, forKey: DynamicTiming.defaultsKey)
+        AppDefaults.shared.synchronize()
         onChange()
     }
 

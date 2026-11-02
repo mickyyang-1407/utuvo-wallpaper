@@ -88,7 +88,7 @@ final class AppModel {
          outputRoot: URL = LabPaths.deliveryRoot,
          serviceFactory: (@MainActor () throws -> GenerationService)? = nil,
          credentialAvailable: (@MainActor () -> Bool)? = nil,
-         preferences: UserDefaults = .standard,
+         preferences: UserDefaults = AppDefaults.shared,
          isBackgroundWorker: Bool = false,
          inUseWallpaperURLs: (@MainActor () -> [URL])? = nil,
          bundleRoot: URL? = AppBundle.host.bundleURL) {

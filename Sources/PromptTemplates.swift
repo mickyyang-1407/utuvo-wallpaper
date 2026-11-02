@@ -221,12 +221,12 @@ struct DailyRecipe: Equatable, Sendable {
     /// 自己的想法：有寫就當每張的主題，用選的風格畫出來。
     var idea = ""
 
-    static func load(_ defaults: UserDefaults = .standard, prefix: String = "daily") -> Self {
+    static func load(_ defaults: UserDefaults = AppDefaults.shared, prefix: String = "daily") -> Self {
         let known = Set(PromptTemplate.shared.map(\.id))
         let styles = (defaults.stringArray(forKey: prefix + ".styles") ?? []).filter(known.contains)
         return Self(styles: styles, idea: defaults.string(forKey: prefix + ".idea") ?? "")
     }
-    func save(_ defaults: UserDefaults = .standard, prefix: String = "daily") {
+    func save(_ defaults: UserDefaults = AppDefaults.shared, prefix: String = "daily") {
         defaults.set(styles, forKey: prefix + ".styles")
         defaults.set(String(idea.prefix(Self.ideaLimit)), forKey: prefix + ".idea")
     }

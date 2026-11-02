@@ -70,7 +70,7 @@ enum CLI {
     static func run(_ mode: CLIMode) async -> Int32 {
         switch mode {
         case .dynamicSwitchTest:
-            guard UserDefaults.standard.bool(forKey: "dynamic.enabled") else { return fail("請先在App設定日夜桌布。") }
+            guard AppDefaults.shared.bool(forKey: "dynamic.enabled") else { return fail("請先在App設定日夜桌布。") }
             guard let lease = try? FileLease.acquire(at: LabPaths.deliveryRoot.appendingPathComponent(".background-tick.lock")) else { return fail("背景正在執行，請稍後。") }
             defer { withExtendedLifetime(lease) {} }
             let model = AppModel(isBackgroundWorker: true)
