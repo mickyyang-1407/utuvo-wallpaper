@@ -31,6 +31,24 @@ extension SelfTest {
         let weekDistinct = Set((0..<7).flatMap { DailyPlan.make(day: "2026-11-0\($0 + 1)", count: 10, recipe: all).map(\.prompt) }).count
         record("每日 10 張：一週 70 張提示詞幾乎不重複", weekDistinct >= 65, "不同 \(weekDistinct)／70")
 
+        // 每個風格連續 N 天（N＝主題數）主題都不重複，隔天一定換。
+        var cycleOK = true
+        var cal0 = Calendar(identifier: .gregorian)
+        cal0.timeZone = TimeZone(identifier: "UTC")!
+        let start0 = cal0.date(from: DateComponents(year: 2026, month: 11, day: 3))!
+        let fmt = DateFormatter()
+        fmt.calendar = cal0; fmt.timeZone = cal0.timeZone; fmt.dateFormat = "yyyy-MM-dd"
+        for template in PromptTemplate.shared {
+            let subjects = (0..<template.subjects.count).map { offset -> String in
+                let day = fmt.string(from: cal0.date(byAdding: .day, value: offset, to: start0)!)
+                let prompt = DailyPlan.make(day: day, count: 10, recipe: all).first { $0.templateID == template.id }!.prompt
+                return template.subjects.first { prompt.contains("Subject: \($0).") } ?? "?"
+            }
+            if Set(subjects).count != template.subjects.count { cycleOK = false }
+        }
+        record("每日 10 張：每個風格把主題輪完一圈才重複（隔天一定換主題）", cycleOK,
+               "風格 \(PromptTemplate.shared.count) 種、主題 \(PromptTemplate.shared.map(\.subjects.count).reduce(0, +)) 個")
+
         let picked = DailyRecipe(styles: ["watercolor-meadow", "cosmic-nebula"], idea: "")
         let pickedPlan = DailyPlan.make(day: "2026-11-02", count: 10, recipe: picked)
         let onlyPicked = pickedPlan.allSatisfy { picked.styles.contains($0.templateID) }

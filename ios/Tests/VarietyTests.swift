@@ -18,6 +18,22 @@ final class VarietyTests: XCTestCase {
         XCTAssertTrue(Set(first.prompts).isDisjoint(with: second.prompts), "隔天 10 張提示詞都不同")
     }
 
+    func testEachStyleCyclesThroughAllSubjectsBeforeRepeating() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let formatter = DateFormatter()
+        formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.dateFormat = "yyyy-MM-dd"
+        let start = calendar.date(from: DateComponents(year: 2026, month: 11, day: 3))!
+        for template in PromptTemplate.shared {
+            let picked = (0..<template.subjects.count).map { offset -> String in
+                let day = formatter.string(from: calendar.date(byAdding: .day, value: offset, to: start)!)
+                let prompt = DailyPlan.make(day: day, count: 10, recipe: DailyRecipe()).first { $0.templateID == template.id }!.prompt
+                return template.subjects.first { prompt.contains("Subject: \($0).") } ?? "?"
+            }
+            XCTAssertEqual(Set(picked).count, template.subjects.count, template.id)
+        }
+    }
+
     func testIdeaAndStylesDriveThePortraitPrompts() async throws {
         let provider = ScriptedProvider([])
         let recipe = DailyRecipe(styles: ["watercolor-meadow", "animation-coast"], idea: "海邊的老火車站")

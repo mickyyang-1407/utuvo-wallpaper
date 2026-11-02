@@ -51,7 +51,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
                 "a glacier-fed lake below granite peaks", "rolling green hills with scattered lone trees",
                 "a coastal cliff path above a turquoise sea", "a quiet birch forest in light fog",
                 "volcanic black-sand beach with sea stacks", "a high desert plateau with wind-carved rocks",
-                "a wide river delta seen from a hilltop",
+                "a wide river delta seen from a hilltop", "a waterfall in a mossy gorge", "a field of wildflowers below distant peaks", "salt flats reflecting the sky",
             ],
             palettes: ["cool blue shadows warming to pale gold", "fresh greens and soft sky blue",
                        "muted earth tones with slate grey", "silver mist and deep evergreen"]),
@@ -61,7 +61,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             subjects: [
                 "one distant mountain silhouette", "a single sailboat on a flat sea", "a lone tree on a gentle hill",
                 "a crescent moon over rolling dunes", "a small house beside a curved road", "three stacked cloud shapes over water",
-                "a paper sun setting behind layered waves",
+                "a paper sun setting behind layered waves", "a lighthouse on a tiny island", "a single hot-air balloon over hills", "a winding river through flat fields",
             ],
             palettes: ["muted teal and pale ochre", "dusty pink and warm sand", "sage green and cream",
                        "navy and soft apricot", "charcoal and pale gold"]),
@@ -70,7 +70,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             style: "Abstract generative art, smooth gradient mesh, silky curved bands with soft blur transitions, luminous depth, no hard edges",
             subjects: [
                 "flowing ribbons of light", "a slow spiral of translucent glass layers", "overlapping soft circles like aurora",
-                "a single wave of liquid silk", "folded light planes in space", "drifting smoke-like color veils",
+                "a single wave of liquid silk", "folded light planes in space", "drifting smoke-like color veils", "a glowing ring of soft light", "stacked translucent glass panes", "rippling liquid metal surface", "soft bokeh orbs floating in depth",
             ],
             palettes: ["deep indigo, violet and warm amber", "emerald, teal and cream", "coral, peach and lilac",
                        "graphite, silver and ice blue", "magenta, orange and plum"],
@@ -81,7 +81,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             subjects: [
                 "a quiet city corner with warm shop windows and bicycles", "a rooftop garden above a dense city",
                 "a small bookstore street after rain", "a tram crossing a hillside town", "a riverside market packing up",
-                "a lighthouse keeper's cottage by the sea", "a night bus stop under a streetlight",
+                "a lighthouse keeper's cottage by the sea", "a night bus stop under a streetlight", "a seaside cafe terrace in the morning", "a mountain cable car station", "a flower market under striped awnings",
             ],
             palettes: ["coral, indigo and cream", "mint, mustard and navy", "rose, teal and sand",
                        "tomato red, olive and ivory"]),
@@ -90,7 +90,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             style: "Astrophotography realism with artistic color grading, very high detail, near-black sky, faint starlight, no planets in the center",
             subjects: [
                 "a deep space nebula with dust lanes", "a spiral galaxy seen at an angle", "a dense star cluster with glowing gas",
-                "the Milky Way core above a dark horizon", "a ring of glowing gas around a dying star", "comet trail crossing a star field",
+                "the Milky Way core above a dark horizon", "a ring of glowing gas around a dying star", "comet trail crossing a star field", "a dark nebula silhouetted against bright gas", "two galaxies merging", "an aurora over a planet horizon seen from orbit",
             ],
             palettes: ["teal and magenta clouds", "gold and deep blue", "crimson and violet", "pale cyan and silver"],
             representational: false),
@@ -100,7 +100,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             subjects: [
                 "a single backlit leaf with glowing veins", "dew droplets on a spider web", "a fern frond unfurling",
                 "the center of a sunflower", "frost crystals on a window", "moss and tiny mushrooms on bark",
-                "a dragonfly wing", "ripples on a still pond surface",
+                "a dragonfly wing", "ripples on a still pond surface", "a snail shell spiral", "pollen on a bee's leg", "soap bubble interference colors",
             ],
             palettes: ["emerald against dark green bokeh", "amber and honey tones", "icy blue and white",
                        "violet and soft pink"]),
@@ -110,7 +110,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             subjects: [
                 "rolling meadows with a narrow winding path", "a harbor with small fishing boats", "an old stone farmhouse in lavender fields",
                 "a canal town with arched bridges", "a mountain lake with reflections", "a seaside village on a hill",
-                "an orchard in blossom",
+                "an orchard in blossom", "a quiet beach with a striped umbrella", "a misty forest stream", "a snowy village street",
             ],
             palettes: ["sage green, honey and dusty rose", "cobalt, ochre and white", "lavender, olive and peach",
                        "teal, rust and cream"]),
@@ -121,7 +121,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
                 "a sunlit sandstone arcade with repeated rounded arches", "a spiral concrete staircase seen from above",
                 "a minimalist white courtyard with a single olive tree", "a brutalist library facade",
                 "a glass atrium with a curved steel roof", "a terracotta-tiled Mediterranean alley",
-                "a Japanese timber corridor around a garden",
+                "a Japanese timber corridor around a garden", "a curved white museum ramp", "a red brick factory turned gallery", "a modern pavilion over a reflecting pool",
             ],
             palettes: ["warm limestone and terracotta", "white, grey and sky blue", "raw concrete and green plants",
                        "pale pink stucco and deep shadow"]),
@@ -132,7 +132,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
                 "a tiny seaside railway station above a turquoise bay", "a hillside town with stairs and laundry lines",
                 "a countryside bus stop under huge summer clouds", "a forest shrine path with lanterns",
                 "a harbor town at festival time", "a schoolyard after the bell under cherry trees",
-                "a rooftop water tower over the city",
+                "a rooftop water tower over the city", "a lakeside camping spot at dusk", "a narrow alley of noodle shops", "a sunflower field beside a railway",
             ],
             palettes: ["muted cream and coral", "summer blue and grass green", "sunset orange and purple",
                        "soft pink and pale mint"]),
@@ -141,7 +141,7 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             style: "Minimal abstract color-field wallpaper, extremely smooth transitions, subtle film grain",
             subjects: [
                 "layered horizontal color fields like a tide", "a soft radial glow fading to the edges",
-                "two overlapping color blurs", "a diagonal gradient band like sunset haze", "a calm vertical aurora curtain",
+                "two overlapping color blurs", "a diagonal gradient band like sunset haze", "a calm vertical aurora curtain", "a soft ring of light on a dark field", "four quiet color blocks blending", "a wavy horizon gradient",
             ],
             palettes: ["deep ocean blue through teal to pale sand", "rose to lilac to midnight", "lime to aqua to navy",
                        "peach to coral to plum", "warm grey to soft gold"],
@@ -201,32 +201,37 @@ enum DailyPlan {
         guard count > 0 else { return [] }
         let templates = recipe.templates
         let idea = recipe.trimmedIdea
-        let seed = DynamicAutoPlanner.stableHash("\(day)#\(salt)")
-        let offset = Int(seed % UInt64(templates.count))
+        // 主題、配色、光線、構圖都依「第幾天」輪替：同一風格要把主題全部用過一輪才會重複，
+        // 隔天一定換；手動生成另加 salt，與當天的每日批次錯開。
+        let dayNumber = dayIndex(day) + (salt.isEmpty ? 0 : Int(DynamicAutoPlanner.stableHash(salt) % 997))
+        let offset = dayNumber % templates.count
         var used: [String: Int] = [:]
-        var usedSubjects = Set<String>()
         return (0..<count).map { index in
             let template = templates[(offset + index) % templates.count]
             let round = used[template.id, default: 0]
             used[template.id] = round + 1
-            let h = DynamicAutoPlanner.stableHash("\(day)#\(salt)#\(template.id)#\(round)")
-            let subject: String
-            if !idea.isEmpty { subject = idea }
-            else {
-                // 同一天同一風格出現多次時，主題不重複。
-                let start = Int(h % UInt64(template.subjects.count))
-                let pick = (0..<template.subjects.count).map { template.subjects[(start + $0) % template.subjects.count] }
-                    .first { !usedSubjects.contains($0) } ?? template.subjects[start]
-                usedSubjects.insert(pick)
-                subject = pick
-            }
-            let palette = template.palettes[Int((h >> 8) % UInt64(template.palettes.count))]
-            let light = PromptTemplate.lights[Int((h >> 16) % UInt64(PromptTemplate.lights.count))]
-            let composition = PromptTemplate.compositions[Int((h >> 24) % UInt64(PromptTemplate.compositions.count))]
+            let base = Int(DynamicAutoPlanner.stableHash(template.id) % 1000)
+            func pick<T>(_ list: [T], stride: Int) -> T { list[(base + dayNumber * stride + round) % list.count] }
+            let subject = idea.isEmpty ? pick(template.subjects, stride: 1) : idea
+            // 自己的想法：主題固定，靠配色、光線、構圖做出差異（同一天多張也各不同）。
+            let palette = pick(template.palettes, stride: 1)
+            let light = pick(PromptTemplate.lights, stride: 5)
+            let composition = pick(PromptTemplate.compositions, stride: 1 + (idea.isEmpty ? 0 : 1))
             let slug = round == 0 ? template.id : "\(template.id)-\(round + 1)"
             return PlannedPrompt(templateID: template.id, slug: slug,
                                  prompt: template.compose(subject: subject, palette: palette, light: light, composition: composition))
         }
+    }
+
+    /// "yyyy-MM-dd" → 從 2000-01-01 起第幾天；看不懂就用雜湊。
+    static func dayIndex(_ day: String) -> Int {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        guard parts.count == 3, let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])),
+              let days = calendar.dateComponents([.day], from: calendar.date(from: DateComponents(year: 2000, month: 1, day: 1))!, to: date).day,
+              days >= 0 else { return Int(DynamicAutoPlanner.stableHash(day) % 100_000) }
+        return days
     }
 
     /// 舊版進度檔沒有存計畫：檔名照舊輪替，提示詞用新的組法。
