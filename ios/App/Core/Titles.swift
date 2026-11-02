@@ -7,16 +7,16 @@ enum WallpaperTitles {
     /// 範本 id → 顯示名稱。字面常數讓 check.py 抽得到 key。
     static func templateTitle(_ id: String) -> String? {
         switch id {
-        case "nature-dawn": return L("破曉山稜")
-        case "minimal-paper": return L("紙上遠山")
+        case "nature-dawn": return L("自然風景")
+        case "minimal-paper": return L("紙雕極簡")
         case "abstract-flow": return L("流動光帶")
-        case "illustration-dusk": return L("黃昏街角")
-        case "cosmic-nebula": return L("星雲深處")
-        case "botanical-macro": return L("葉脈微距")
-        case "watercolor-meadow": return L("田園午後")
-        case "architecture-arcade": return L("沙色拱廊")
-        case "animation-coast": return L("海邊車站")
-        case "gradient-tide": return L("潮汐漸層")
+        case "illustration-dusk": return L("插畫街景")
+        case "cosmic-nebula": return L("深空")
+        case "botanical-macro": return L("自然微距")
+        case "watercolor-meadow": return L("水彩風景")
+        case "architecture-arcade": return L("建築光影")
+        case "animation-coast": return L("手繪動畫")
+        case "gradient-tide": return L("柔和漸層")
         default: return nil
         }
     }

@@ -5,130 +5,237 @@ import Foundation
 /// 設計原則：
 /// - 只描述「風格與主題」，不模仿任何在世畫家或特定藝術家的風格。
 /// - 每張圖 16:9、純圖像、無文字、無浮水印。
+/// - 風格（style）固定，主題（subjects）與配色（palettes）每天換，同一風格才不會天天長一樣。
 struct PromptTemplate: Identifiable, Hashable, Sendable {
     let id: String
     /// 中文介面顯示的名稱
     let title: String
     /// 分類
     let category: String
-    /// 送給模型的提示詞（英文，模型效果較穩）
-    let prompt: String
+    /// 畫風描述（英文，模型效果較穩）
+    let style: String
+    /// 可輪替的主題
+    let subjects: [String]
+    /// 可輪替的配色
+    let palettes: [String]
+    /// 寫實或具象畫面才加光線描述；抽象、宇宙不加。
+    var representational = true
+
+    /// 預設組合（第一個主題、第一組配色）。
+    var prompt: String { compose(subject: subjects[0], palette: palettes[0], light: nil, composition: nil) }
+
+    func compose(subject: String, palette: String, light: String?, composition: String?) -> String {
+        var parts = [style, "Subject: \(subject)", "Palette: \(palette)"]
+        if let light, representational { parts.append(light) }
+        if let composition { parts.append(composition) }
+        parts.append("wide 16:9 desktop wallpaper, no text, no watermark, no logos")
+        return parts.joined(separator: ". ") + "."
+    }
+
+    static let lights = [
+        "soft early morning light", "clear midday light", "warm late afternoon light",
+        "golden hour backlight", "overcast diffused light", "blue hour after sunset",
+    ]
+    static let compositions = [
+        "wide open composition with generous negative space", "low horizon with a large sky",
+        "subject placed off-center on the right third", "subject placed off-center on the left third",
+        "layered foreground, middle ground and distance", "calm symmetrical composition",
+    ]
 
     static let shared: [PromptTemplate] = [
         PromptTemplate(
-            id: "nature-dawn",
-            title: "自然 · 破曉山稜",
-            category: "自然",
-            prompt: """
-            A serene alpine mountain range at first light, low mist drifting between layered \
-            ridgelines, cool blue shadows warming to pale gold on the peaks, delicate atmospheric \
-            depth, natural photographic realism, ultra detailed, wide 16:9 desktop wallpaper \
-            composition, no text, no watermark, no people.
-            """
-        ),
+            id: "nature-dawn", title: "自然 · 自然風景", category: "自然",
+            style: "Natural landscape photograph, photographic realism, ultra detailed, delicate atmospheric depth, no people",
+            subjects: [
+                "layered alpine ridgelines with low mist drifting between them",
+                "a glacier-fed lake below granite peaks", "rolling green hills with scattered lone trees",
+                "a coastal cliff path above a turquoise sea", "a quiet birch forest in light fog",
+                "volcanic black-sand beach with sea stacks", "a high desert plateau with wind-carved rocks",
+                "a wide river delta seen from a hilltop",
+            ],
+            palettes: ["cool blue shadows warming to pale gold", "fresh greens and soft sky blue",
+                       "muted earth tones with slate grey", "silver mist and deep evergreen"]),
         PromptTemplate(
-            id: "minimal-paper",
-            title: "極簡 · 紙上遠山",
-            category: "極簡",
-            prompt: """
-            Minimalist paper-craft landscape, soft off-white paper texture with a single band of \
-            muted teal and pale ochre, one distant mountain silhouette, vast negative space, \
-            subtle grain, flat graphic design with restrained color palette, elegant and calm, \
-            16:9 desktop wallpaper, no text, no watermark.
-            """
-        ),
+            id: "minimal-paper", title: "極簡 · 紙雕極簡", category: "極簡",
+            style: "Minimalist paper-craft scene, soft off-white paper texture, layered cut-paper shapes, subtle grain, flat graphic design, vast negative space, elegant and calm",
+            subjects: [
+                "one distant mountain silhouette", "a single sailboat on a flat sea", "a lone tree on a gentle hill",
+                "a crescent moon over rolling dunes", "a small house beside a curved road", "three stacked cloud shapes over water",
+                "a paper sun setting behind layered waves",
+            ],
+            palettes: ["muted teal and pale ochre", "dusty pink and warm sand", "sage green and cream",
+                       "navy and soft apricot", "charcoal and pale gold"]),
         PromptTemplate(
-            id: "abstract-flow",
-            title: "抽象 · 流動光帶",
-            category: "抽象",
-            prompt: """
-            Abstract flowing ribbons of light, smooth gradient mesh in deep indigo, violet and \
-            warm amber, silky curved bands with soft blur transitions, luminous depth, no hard \
-            edges, premium generative art wallpaper, 16:9, no text, no watermark, no logos.
-            """
-        ),
+            id: "abstract-flow", title: "抽象 · 流動光帶", category: "抽象",
+            style: "Abstract generative art, smooth gradient mesh, silky curved bands with soft blur transitions, luminous depth, no hard edges",
+            subjects: [
+                "flowing ribbons of light", "a slow spiral of translucent glass layers", "overlapping soft circles like aurora",
+                "a single wave of liquid silk", "folded light planes in space", "drifting smoke-like color veils",
+            ],
+            palettes: ["deep indigo, violet and warm amber", "emerald, teal and cream", "coral, peach and lilac",
+                       "graphite, silver and ice blue", "magenta, orange and plum"],
+            representational: false),
         PromptTemplate(
-            id: "illustration-dusk",
-            title: "插畫 · 黃昏街角",
-            category: "插畫",
-            prompt: """
-            Editorial illustration of a quiet city corner at dusk, warm shop windows, bicycles \
-            against a brick wall, long violet shadows, flat vector shapes with subtle grain \
-            texture, limited palette of coral, indigo and cream, charming and calm, \
-            16:9 desktop wallpaper, no text, no watermark.
-            """
-        ),
+            id: "illustration-dusk", title: "插畫 · 插畫街景", category: "插畫",
+            style: "Editorial illustration, flat vector shapes with subtle grain texture, limited palette, charming and calm",
+            subjects: [
+                "a quiet city corner with warm shop windows and bicycles", "a rooftop garden above a dense city",
+                "a small bookstore street after rain", "a tram crossing a hillside town", "a riverside market packing up",
+                "a lighthouse keeper's cottage by the sea", "a night bus stop under a streetlight",
+            ],
+            palettes: ["coral, indigo and cream", "mint, mustard and navy", "rose, teal and sand",
+                       "tomato red, olive and ivory"]),
         PromptTemplate(
-            id: "cosmic-nebula",
-            title: "宇宙 · 星雲深處",
-            category: "宇宙",
-            prompt: """
-            Deep space nebula, dust lanes and faint starlight, teal and magenta clouds against \
-            near-black sky, subtle spiral structure, astrophotography realism with artistic color \
-            grading, very high detail, 16:9 desktop wallpaper, no text, no watermark, no planets \
-            in the center.
-            """
-        ),
+            id: "cosmic-nebula", title: "宇宙 · 深空", category: "宇宙",
+            style: "Astrophotography realism with artistic color grading, very high detail, near-black sky, faint starlight, no planets in the center",
+            subjects: [
+                "a deep space nebula with dust lanes", "a spiral galaxy seen at an angle", "a dense star cluster with glowing gas",
+                "the Milky Way core above a dark horizon", "a ring of glowing gas around a dying star", "comet trail crossing a star field",
+            ],
+            palettes: ["teal and magenta clouds", "gold and deep blue", "crimson and violet", "pale cyan and silver"],
+            representational: false),
         PromptTemplate(
-            id: "botanical-macro",
-            title: "自然 · 葉脈微距",
-            category: "自然",
-            prompt: """
-            Macro photograph of a single backlit leaf, intricate vein structure glowing emerald \
-            against a soft dark bokeh background, dew droplets catching light, high detail, \
-            natural color science, vertical texture yet wide 16:9 framing, \
-            no text, no watermark.
-            """
-        ),
+            id: "botanical-macro", title: "自然 · 自然微距", category: "自然",
+            style: "Macro nature photograph, intricate detail, soft bokeh background, natural color science",
+            subjects: [
+                "a single backlit leaf with glowing veins", "dew droplets on a spider web", "a fern frond unfurling",
+                "the center of a sunflower", "frost crystals on a window", "moss and tiny mushrooms on bark",
+                "a dragonfly wing", "ripples on a still pond surface",
+            ],
+            palettes: ["emerald against dark green bokeh", "amber and honey tones", "icy blue and white",
+                       "violet and soft pink"]),
         PromptTemplate(
-            id: "watercolor-meadow",
-            title: "水彩 · 田園午後",
-            category: "水彩",
-            prompt: """
-            Original watercolor landscape of rolling meadows and a narrow winding path,
-            soft afternoon light, transparent washes of sage green, honey and dusty rose,
-            visible cold-pressed paper texture, loose edges, spacious composition,
-            quiet and inviting, wide 16:9 desktop wallpaper, no text, no watermark.
-            """
-        ),
+            id: "watercolor-meadow", title: "水彩 · 水彩風景", category: "水彩",
+            style: "Original watercolor painting, transparent washes, visible cold-pressed paper texture, loose edges, spacious composition, quiet and inviting",
+            subjects: [
+                "rolling meadows with a narrow winding path", "a harbor with small fishing boats", "an old stone farmhouse in lavender fields",
+                "a canal town with arched bridges", "a mountain lake with reflections", "a seaside village on a hill",
+                "an orchard in blossom",
+            ],
+            palettes: ["sage green, honey and dusty rose", "cobalt, ochre and white", "lavender, olive and peach",
+                       "teal, rust and cream"]),
         PromptTemplate(
-            id: "architecture-arcade",
-            title: "建築 · 沙色拱廊",
-            category: "建築",
-            prompt: """
-            Architectural photograph of a sunlit sandstone arcade, repeated rounded arches,
-            warm limestone, terracotta floor, long geometric shadows and a small olive tree,
-            precise material detail, restrained composition, no people,
-            wide 16:9 desktop wallpaper, no text, no watermark.
-            """
-        ),
+            id: "architecture-arcade", title: "建築 · 建築光影", category: "建築",
+            style: "Architectural photograph, precise material detail, restrained composition, long geometric shadows, no people",
+            subjects: [
+                "a sunlit sandstone arcade with repeated rounded arches", "a spiral concrete staircase seen from above",
+                "a minimalist white courtyard with a single olive tree", "a brutalist library facade",
+                "a glass atrium with a curved steel roof", "a terracotta-tiled Mediterranean alley",
+                "a Japanese timber corridor around a garden",
+            ],
+            palettes: ["warm limestone and terracotta", "white, grey and sky blue", "raw concrete and green plants",
+                       "pale pink stucco and deep shadow"]),
         PromptTemplate(
-            id: "animation-coast",
-            title: "動畫 · 海邊車站",
-            category: "動畫",
-            prompt: """
-            Original hand-drawn animation background of a tiny seaside railway station,
-            an empty platform overlooking a turquoise bay, distant hills and summer clouds,
-            delicate painted textures, expressive clean linework, muted cream and coral,
-            gentle nostalgic atmosphere, wide 16:9 desktop wallpaper,
-            no characters, no text, no watermark, no logos.
-            """
-        ),
+            id: "animation-coast", title: "動畫 · 手繪動畫", category: "動畫",
+            style: "Original hand-drawn animation background, delicate painted textures, expressive clean linework, gentle nostalgic atmosphere, no characters",
+            subjects: [
+                "a tiny seaside railway station above a turquoise bay", "a hillside town with stairs and laundry lines",
+                "a countryside bus stop under huge summer clouds", "a forest shrine path with lanterns",
+                "a harbor town at festival time", "a schoolyard after the bell under cherry trees",
+                "a rooftop water tower over the city",
+            ],
+            palettes: ["muted cream and coral", "summer blue and grass green", "sunset orange and purple",
+                       "soft pink and pale mint"]),
         PromptTemplate(
-            id: "gradient-tide",
-            title: "抽象 · 潮汐漸層",
-            category: "抽象",
-            prompt: """
-            Soft gradient tide, layered horizontal color fields from deep ocean blue through \
-            teal to pale sand, extremely smooth transitions, subtle film grain, minimal abstract \
-            wallpaper with calm horizontal rhythm, 16:9, no text, no watermark.
-            """
-        )
+            id: "gradient-tide", title: "抽象 · 柔和漸層", category: "抽象",
+            style: "Minimal abstract color-field wallpaper, extremely smooth transitions, subtle film grain",
+            subjects: [
+                "layered horizontal color fields like a tide", "a soft radial glow fading to the edges",
+                "two overlapping color blurs", "a diagonal gradient band like sunset haze", "a calm vertical aurora curtain",
+            ],
+            palettes: ["deep ocean blue through teal to pale sand", "rose to lilac to midnight", "lime to aqua to navy",
+                       "peach to coral to plum", "warm grey to soft gold"],
+            representational: false),
     ]
 
-    /// 依序輪替使用模板。
+    /// 依序輪替使用模板（舊行為；舊的每日進度檔續作時用）。
     static func rotated(count: Int, startingAt offset: Int = 0) -> [PromptTemplate] {
         guard !shared.isEmpty, count > 0 else { return [] }
         return (0..<count).map { shared[(offset + $0) % shared.count] }
+    }
+}
+
+/// 使用者選的每日生成方式：哪些風格、要不要用自己的想法當主題。
+struct DailyRecipe: Equatable, Sendable {
+    static let stylesKey = "daily.styles"
+    static let ideaKey = "daily.idea"
+    static let ideaLimit = 200
+
+    /// 選了哪些風格（範本 id）；空＝全部。
+    var styles: [String] = []
+    /// 自己的想法：有寫就當每張的主題，用選的風格畫出來。
+    var idea = ""
+
+    static func load(_ defaults: UserDefaults = .standard) -> Self {
+        let known = Set(PromptTemplate.shared.map(\.id))
+        let styles = (defaults.stringArray(forKey: stylesKey) ?? []).filter(known.contains)
+        return Self(styles: styles, idea: defaults.string(forKey: ideaKey) ?? "")
+    }
+    func save(_ defaults: UserDefaults = .standard) {
+        defaults.set(styles, forKey: Self.stylesKey)
+        defaults.set(String(idea.prefix(Self.ideaLimit)), forKey: Self.ideaKey)
+    }
+
+    var templates: [PromptTemplate] {
+        let picked = PromptTemplate.shared.filter { styles.contains($0.id) }
+        return picked.isEmpty ? PromptTemplate.shared : picked
+    }
+    var trimmedIdea: String {
+        String(idea.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.ideaLimit))
+    }
+}
+
+/// 一張要生成的圖：用哪個風格、檔名前綴、送出的提示詞。
+struct PlannedPrompt: Codable, Equatable, Sendable {
+    var templateID: String
+    var slug: String
+    var prompt: String
+
+    var template: PromptTemplate? { PromptTemplate.shared.first { $0.id == templateID } }
+    var title: String { template?.title ?? templateID }
+}
+
+enum DailyPlan {
+    /// 同一天、同一組設定結果固定（續作時才對得上）；不同天主題、配色、光線、構圖都換。
+    static func make(day: String, count: Int, recipe: DailyRecipe, salt: String = "") -> [PlannedPrompt] {
+        guard count > 0 else { return [] }
+        let templates = recipe.templates
+        let idea = recipe.trimmedIdea
+        let seed = DynamicAutoPlanner.stableHash("\(day)#\(salt)")
+        let offset = Int(seed % UInt64(templates.count))
+        var used: [String: Int] = [:]
+        var usedSubjects = Set<String>()
+        return (0..<count).map { index in
+            let template = templates[(offset + index) % templates.count]
+            let round = used[template.id, default: 0]
+            used[template.id] = round + 1
+            let h = DynamicAutoPlanner.stableHash("\(day)#\(salt)#\(template.id)#\(round)")
+            let subject: String
+            if !idea.isEmpty { subject = idea }
+            else {
+                // 同一天同一風格出現多次時，主題不重複。
+                let start = Int(h % UInt64(template.subjects.count))
+                let pick = (0..<template.subjects.count).map { template.subjects[(start + $0) % template.subjects.count] }
+                    .first { !usedSubjects.contains($0) } ?? template.subjects[start]
+                usedSubjects.insert(pick)
+                subject = pick
+            }
+            let palette = template.palettes[Int((h >> 8) % UInt64(template.palettes.count))]
+            let light = PromptTemplate.lights[Int((h >> 16) % UInt64(PromptTemplate.lights.count))]
+            let composition = PromptTemplate.compositions[Int((h >> 24) % UInt64(PromptTemplate.compositions.count))]
+            let slug = round == 0 ? template.id : "\(template.id)-\(round + 1)"
+            return PlannedPrompt(templateID: template.id, slug: slug,
+                                 prompt: template.compose(subject: subject, palette: palette, light: light, composition: composition))
+        }
+    }
+
+    /// 舊版進度檔沒有存計畫：檔名照舊輪替，提示詞用新的組法。
+    static func legacy(day: String, count: Int) -> [PlannedPrompt] {
+        let templates = PromptTemplate.rotated(count: count)
+        let fresh = make(day: day, count: count, recipe: DailyRecipe(styles: [], idea: ""))
+        return templates.enumerated().map { index, template in
+            let match = fresh.first { $0.templateID == template.id }?.prompt ?? template.prompt
+            return PlannedPrompt(templateID: template.id, slug: template.id, prompt: index < fresh.count ? match : template.prompt)
+        }
     }
 }

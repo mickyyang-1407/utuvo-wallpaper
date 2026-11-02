@@ -18,6 +18,7 @@ struct UTUVOWallpaperApp: App {
                     DeviceScreen.refresh()
                     model.reload()
                     model.runDailyIfNeeded()
+                    model.runDynamicAutoIfNeeded()
                     location.refreshIfAuthorized()
                     #if DEBUG
                     model.startLiveOneIfRequested()

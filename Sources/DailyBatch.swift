@@ -7,6 +7,8 @@ struct DailyBatch: Codable {
     var completed: [GeneratedWallpaper] = []
     var attempts: [Int]
     var retryAfter: Date? = Date()
+    /// 這一批的提示詞（建立時就定好，續作照用）；舊版進度檔沒有。
+    var plan: [PlannedPrompt]?
 
     static func url(root: URL, day: String) -> URL {
         root.appendingPathComponent("daily-\(day).json")
@@ -14,16 +16,21 @@ struct DailyBatch: Codable {
     static func load(root: URL, day: String) throws -> Self {
         try JSONDecoder().decode(Self.self, from: Data(contentsOf: url(root: root, day: day)))
     }
-    static func prepare(root: URL, day: String, count: Int) throws -> Self {
+    static func prepare(root: URL, day: String, count: Int, plan: [PlannedPrompt]? = nil) throws -> Self {
         if FileManager.default.fileExists(atPath: url(root: root, day: day).path) {
             let batch = try load(root: root, day: day)
             guard batch.count == count, batch.attempts.count == count,
                   batch.completed.count <= count else { throw GenerationError.invalidResponse }
             return batch
         }
-        let batch = Self(count: count, attempts: Array(repeating: 0, count: count))
+        let batch = Self(count: count, attempts: Array(repeating: 0, count: count), plan: plan)
         try batch.save(root: root, day: day)
         return batch
+    }
+    /// 這一批要生成的內容：有存就照存的，舊檔照舊輪替。
+    func prompts(day: String) -> [PlannedPrompt] {
+        if let plan, plan.count == count { return plan }
+        return DailyPlan.legacy(day: day, count: count)
     }
     func save(root: URL, day: String) throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

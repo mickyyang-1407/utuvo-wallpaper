@@ -16,6 +16,11 @@ final class AppModel: ObservableObject {
     @Published var dynamicEnabled = false { didSet { prefs.dynamicEnabled = dynamicEnabled } }
     @Published var dynamicSceneID = "demo"
     @Published var publishedScene: SceneRecord?
+    /// 每日 10 張的風格與自己的想法；新的一批才生效。
+    @Published var dailyRecipe = DailyRecipe() { didSet { dailyRecipe.save(prefs.defaults) } }
+    /// 日夜 AI 自動：每天／每週自動挑場景生成。
+    @Published var dynamicAutoFrequency = DynamicAutoFrequency.off { didSet { dynamicAutoFrequency.save(prefs.defaults) } }
+    @Published private(set) var dynamicAutoState: DynamicAutoState?
 
     @Published var dailyProgress: (done: Int, total: Int)?
     @Published var isDailyRunning = false
@@ -41,6 +46,8 @@ final class AppModel: ObservableObject {
         dailyEnabled = prefs.dailyEnabled
         dynamicEnabled = prefs.dynamicEnabled
         dynamicSceneID = prefs.dynamicSceneID
+        dailyRecipe = DailyRecipe.load(prefs.defaults)
+        dynamicAutoFrequency = DynamicAutoFrequency.load(prefs.defaults)
         reload()
     }
 
@@ -51,6 +58,7 @@ final class AppModel: ObservableObject {
     func reload() {
         items = WallpaperLibrary.load(paths: paths)
         publishedScene = SceneGenerationService.published(paths: paths)
+        dynamicAutoState = DynamicAutoState.load(from: paths.dynamicAutoState)
         if dynamicSceneID != "demo", publishedScene?.id != dynamicSceneID { dynamicSceneID = "demo"; prefs.dynamicSceneID = "demo" }
         dailyProgress = DailyGenerationService.status(paths: paths, day: AppPaths.dayString(Date()))
         keyStored = (try? store.exists()) == true
@@ -142,7 +150,8 @@ final class AppModel: ObservableObject {
         dailyError = nil
         defer { isDailyRunning = false; reload() }
         do {
-            let service = DailyGenerationService(provider: try provider(), paths: paths, target: DeviceScreen.nativePixels)
+            let service = DailyGenerationService(provider: try provider(), paths: paths, target: DeviceScreen.nativePixels,
+                                                 recipe: dailyRecipe)
             _ = try await GenerationLease.shared.run {
                 try await service.run(day: AppPaths.dayString(Date())) { done, total in
                     Task { @MainActor in self.dailyProgress = (done, total); self.items = WallpaperLibrary.load(paths: self.paths) }
@@ -167,6 +176,67 @@ final class AppModel: ObservableObject {
             }
             dynamicSceneID = record.id
             prefs.dynamicSceneID = record.id
+        } catch {
+            sceneError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
+        }
+    }
+
+    // MARK: 日夜 AI 自動
+
+    /// App 打開時檢查：這一期還沒做就讓 AI 挑場景生成。缺 key 不記次數。
+    func runDynamicAutoIfNeeded(now: Date = Date()) {
+        guard sceneProgress == nil, dynamicAutoFrequency != .off, keyStored || keyFromEnvironment else { return }
+        let context = Self.plannerContext(prefs.defaults)
+        guard let state = DynamicAutoPlanner.due(state: DynamicAutoState.load(from: paths.dynamicAutoState), now: now,
+                                                 frequency: dynamicAutoFrequency, southern: context.southern,
+                                                 chinese: context.chinese) else { return }
+        Task { await generateAutoScene(state) }
+    }
+
+    /// 「現在用 AI 生成一組」。
+    func generateAutoSceneNow(now: Date = Date()) async {
+        let context = Self.plannerContext(prefs.defaults)
+        await generateAutoScene(DynamicAutoPlanner.manual(state: DynamicAutoState.load(from: paths.dynamicAutoState), now: now,
+                                                          frequency: dynamicAutoFrequency, southern: context.southern,
+                                                          chinese: context.chinese))
+    }
+
+    nonisolated static func plannerContext(_ defaults: UserDefaults) -> (southern: Bool, chinese: Bool) {
+        let southern = DynamicTiming.load(defaults) == .solar && Coordinate.load(defaults).0.latitude < 0
+        return (southern, (Locale.preferredLanguages.first ?? "").hasPrefix("zh"))
+    }
+
+    func generateAutoScene(_ planned: DynamicAutoState) async {
+        guard sceneProgress == nil else { return }
+        let url = paths.dynamicAutoState
+        var state = planned
+        state.attempts += 1
+        state.retryAfter = nil
+        let counted = state
+        do {
+            let service = SceneGenerationService(provider: try provider(), paths: paths, target: DeviceScreen.nativePixels)
+            sceneError = nil
+            sceneProgress = 0
+            defer { sceneProgress = nil; reload() }
+            do {
+                let record = try await GenerationLease.shared.run {
+                    // 付費請求送出前先記次數。
+                    try counted.save(to: url)
+                    return try await service.generate(prompt: counted.prompt, id: counted.sceneID) { step in
+                        Task { @MainActor in self.sceneProgress = step }
+                    }
+                }
+                state.recordSuccess()
+                try? state.save(to: url)
+                dynamicSceneID = record.id
+                prefs.dynamicSceneID = record.id
+            } catch GenerationError.cooldown {
+                return  // 另一個生成在跑（例如每日批次），下次打開再試，不算次數
+            } catch {
+                state.recordFailure(retryable: error is CancellationError || DailyBatch.isRetryable(error), now: Date())
+                try? state.save(to: url)
+                sceneError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
+            }
         } catch {
             sceneError = (error as? LocalizedError)?.errorDescription ?? L("生成失敗。")
         }
@@ -234,7 +304,8 @@ enum BackgroundScheduler {
             return
         }
         let work = Task {
-            let service = DailyGenerationService(provider: provider, paths: paths, target: DeviceScreen.nativePixels)
+            let service = DailyGenerationService(provider: provider, paths: paths, target: DeviceScreen.nativePixels,
+                                                 recipe: DailyRecipe.load(prefs.defaults))
             do {
                 _ = try await GenerationLease.shared.run { try await service.run(day: day) }
                 task.setTaskCompleted(success: true)

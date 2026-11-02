@@ -62,6 +62,32 @@ struct SettingsView: View {
                     row("sparkles", Palette.green) {
                         Toggle(L("每日自動生成"), isOn: $model.dailyEnabled).tint(Palette.green)
                     }
+                    row("paintpalette", Color(hex: 0xBF5AF2)) {
+                        Text(L("風格"))
+                        Spacer()
+                        Menu {
+                            Button(L("全部風格")) { model.dailyRecipe.styles = [] }
+                            Divider()
+                            ForEach(PromptTemplate.shared) { template in
+                                Toggle(WallpaperTitles.templateTitle(template.id) ?? template.id, isOn: Binding(
+                                    get: { model.dailyRecipe.styles.contains(template.id) },
+                                    set: { on in
+                                        var styles = model.dailyRecipe.styles
+                                        if on { styles.append(template.id) } else { styles.removeAll { $0 == template.id } }
+                                        model.dailyRecipe.styles = PromptTemplate.shared.map(\.id).filter(styles.contains)
+                                    }))
+                            }
+                        } label: {
+                            Text(model.dailyRecipe.styles.isEmpty ? L("全部風格") : L("\(model.dailyRecipe.styles.count) 種風格"))
+                        }
+                    }
+                    row("lightbulb", Color(hex: 0xFFD60A)) {
+                        TextField(L("自己的想法（選填）"), text: Binding(
+                            get: { model.dailyRecipe.idea },
+                            set: { model.dailyRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
+                                  prompt: Text(L("例如：台北的老公寓陽台")), axis: .vertical)
+                            .lineLimit(1...3)
+                    }
                     if let p = model.dailyProgress {
                         row("calendar", Color(hex: 0x0A84FF)) {
                             Text(L("今天"))
@@ -96,7 +122,7 @@ struct SettingsView: View {
                     }
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(L("每天最多一批 10 張、10 種不同主題。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。"))
+                        Text(L("每天最多一批 10 張，每天換主題、配色、光線與構圖；寫了自己的想法就每張都畫它。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。"))
                         Text(L("換圖頻率決定捷徑「取得目前桌布」多久換一張。"))
                         if timing == .solar {
                             let schedule = DynamicSchedule.load()

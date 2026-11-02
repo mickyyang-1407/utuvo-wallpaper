@@ -1042,9 +1042,17 @@ struct ContentView: View {
                 IconTile(symbol: "wand.and.rays", color: WallpaperSection.dynamic.color, size: 28)
                 Text("生成自己的日夜桌布").font(.system(size: 17, weight: .semibold))
             }
-            TextField("描述同一個場景", text: $scenePrompt, axis: .vertical)
-                .lineLimit(2...4)
-                .textFieldStyle(.roundedBorder)
+            Picker("場景來源", selection: $model.dynamicAutoFrequency) {
+                ForEach(DynamicAutoFrequency.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            if model.dynamicAutoFrequency == .off {
+                TextField("描述同一個場景", text: $scenePrompt, axis: .vertical)
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+            } else {
+                autoSceneInfo
+            }
             Text("先生成白天，再參考同一張原圖編修清晨、黃昏、夜晚；原圖保留，成品為 6144 × 3456 重採樣。")
                 .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1057,13 +1065,38 @@ struct ContentView: View {
                     Button("取消生成") { model.cancelGeneration() }.buttonStyle(SecondaryCapsuleStyle())
                 }
             } else {
-                Button("生成四時段 6K") { model.startDynamicGeneration(prompt: scenePrompt) }
-                    .buttonStyle(PrimaryCapsuleStyle())
-                    .disabled(scenePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if model.dynamicAutoFrequency == .off {
+                    Button("生成四時段 6K") { model.startDynamicGeneration(prompt: scenePrompt) }
+                        .buttonStyle(PrimaryCapsuleStyle())
+                        .disabled(scenePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                } else {
+                    Button("現在用 AI 生成一組") { model.generateAutoSceneNow() }
+                        .buttonStyle(PrimaryCapsuleStyle())
+                }
             }
         }
         .padding(18)
         .wallpaperCard()
+    }
+
+    /// AI 自動：說明＋上一組狀態。
+    private var autoSceneInfo: some View {
+        let state = model.dynamicAutoState
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(model.dynamicAutoFrequency == .daily
+                 ? "AI 每天依季節挑一個新場景，自動生成四時段；日夜模式開著會直接換上。"
+                 : "AI 每週依季節挑一個新場景，自動生成四時段；日夜模式開著會直接換上。")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("每組 4 次圖片生成，使用你的 OpenAI API 額度。需要背景服務或保持 App 開著。")
+                .foregroundStyle(WallpaperPalette.secondaryText)
+            if let state {
+                Text(state.completed ? L("上一組：\(state.prompt)")
+                     : state.attempts >= DynamicAutoState.maxAttempts ? L("這一期未完成：\(state.prompt)")
+                     : L("進行中：\(state.prompt)"))
+                    .foregroundStyle(WallpaperPalette.secondaryText).lineLimit(2)
+            }
+        }
+        .font(.callout)
     }
 
     /// 四步驟：白天 → 清晨 → 黃昏 → 夜晚（與生成順序一致），完成打勾。
@@ -1117,7 +1150,7 @@ struct ContentView: View {
                                 .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
                         }
                     }
-                    infoCard(title: "桌面") { displayPicker }
+                    infoCard(title: "桌面") { displayPicker; inspectorApplyButton(wallpaper: nil) }
                     Button("匯出 HEIC…", systemImage: "square.and.arrow.up") { exportDynamic() }
                         .buttonStyle(SecondaryCapsuleStyle())
                         .disabled(previewedScene?.hasExport != true)
@@ -1146,7 +1179,7 @@ struct ContentView: View {
                             Text(wallpaper.name).font(.caption).lineLimit(3).textSelection(.enabled)
                         }
                     }
-                    infoCard(title: "桌面") { displayPicker }
+                    infoCard(title: "桌面") { displayPicker; inspectorApplyButton(wallpaper: wallpaper) }
                 } else {
                     ContentUnavailableView("選取桌布", systemImage: "photo")
                         .frame(maxWidth: .infinity, minHeight: 300)
@@ -1212,6 +1245,17 @@ struct ContentView: View {
             Text(value).monospacedDigit().multilineTextAlignment(.trailing)
         }
         .font(.callout)
+    }
+
+    /// 資訊欄裡的「設為桌布」：選完螢幕就近按，不必回去找底部工具列。
+    private func inspectorApplyButton(wallpaper: Wallpaper?) -> some View {
+        Button(model.isApplying ? "套用中…" : "設為桌布", systemImage: "photo.on.rectangle") {
+            if let wallpaper { Task { await model.apply(wallpaper) } }
+            else { let directory = previewedScene?.directory; Task { await model.activateDynamic(directory: directory) } }
+        }
+        .buttonStyle(PrimaryCapsuleStyle())
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .disabled(model.isApplying || (wallpaper == nil && !(previewedScene.map { DynamicSceneEntry.isComplete($0.directory) } ?? false)))
     }
 
     private var displayPicker: some View {
@@ -1299,12 +1343,42 @@ struct ContentView: View {
                 Picker("張數", selection: Binding(get: { model.dailyMode }, set: { model.setDailyMode($0) })) {
                     ForEach(DailyScheduler.Mode.allCases) { Text($0.title).tag($0) }
                 }
+                LabeledContent("風格") { dailyStyleMenu }
+                TextField("自己的想法（選填）", text: Binding(get: { model.dailyRecipe.idea },
+                                                     set: { model.dailyRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
+                          prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
+                    .lineLimit(1...3)
+                Text(model.dailyRecipe.trimmedIdea.isEmpty
+                     ? "每天換主題、配色、光線與構圖。"
+                     : "每張都畫你的想法，用選的風格輪流表現。")
+                    .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
                 Text("設定會保留。每天最多一批，使用 API 額度。要在關閉視窗後繼續，請到設定啟用背景服務；背景只輪換 6K 成品。")
                     .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
                 Button("背景服務設定") { showSchedule = false; showSettings = true }
             }
         }
-        .formStyle(.grouped).frame(width: 400, height: 560)
+        .formStyle(.grouped).frame(width: 400, height: 660)
+    }
+
+    /// 每日風格多選：全部或挑幾種。
+    private var dailyStyleMenu: some View {
+        let selected = model.dailyRecipe.styles
+        return Menu {
+            Button("全部風格") { model.dailyRecipe.styles = [] }
+            Divider()
+            ForEach(PromptTemplate.shared) { template in
+                Toggle(templateDisplayTitle(template.id) ?? template.id, isOn: Binding(
+                    get: { selected.contains(template.id) },
+                    set: { on in
+                        var styles = model.dailyRecipe.styles
+                        if on { styles.append(template.id) } else { styles.removeAll { $0 == template.id } }
+                        model.dailyRecipe.styles = PromptTemplate.shared.map(\.id).filter(styles.contains)
+                    }))
+            }
+        } label: {
+            Text(selected.isEmpty ? L("全部風格") : L("\(selected.count) 種風格"))
+        }
+        .fixedSize()
     }
 
     private var statusBar: some View {
@@ -1401,16 +1475,16 @@ struct ContentView: View {
 /// 範本 id → 顯示名稱。字面常數讓 check.py 抽得到 key。
 private func templateDisplayTitle(_ id: String) -> String? {
     switch id {
-    case "nature-dawn": return L("破曉山稜")
-    case "minimal-paper": return L("紙上遠山")
+    case "nature-dawn": return L("自然風景")
+    case "minimal-paper": return L("紙雕極簡")
     case "abstract-flow": return L("流動光帶")
-    case "illustration-dusk": return L("黃昏街角")
-    case "cosmic-nebula": return L("星雲深處")
-    case "botanical-macro": return L("葉脈微距")
-    case "watercolor-meadow": return L("田園午後")
-    case "architecture-arcade": return L("沙色拱廊")
-    case "animation-coast": return L("海邊車站")
-    case "gradient-tide": return L("潮汐漸層")
+    case "illustration-dusk": return L("插畫街景")
+    case "cosmic-nebula": return L("深空")
+    case "botanical-macro": return L("自然微距")
+    case "watercolor-meadow": return L("水彩風景")
+    case "architecture-arcade": return L("建築光影")
+    case "animation-coast": return L("手繪動畫")
+    case "gradient-tide": return L("柔和漸層")
     default: return nil
     }
 }

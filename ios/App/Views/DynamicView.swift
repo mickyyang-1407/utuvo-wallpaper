@@ -83,25 +83,58 @@ struct DynamicView: View {
 
     private var newSceneCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField(L("例如：湖邊的小木屋與松林"), text: $prompt, axis: .vertical)
-                .lineLimit(2...4).focused($focused)
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.trackFill))
+            HStack {
+                Text(L("場景來源"))
+                Spacer()
+                Picker(L("場景來源"), selection: $model.dynamicAutoFrequency) {
+                    ForEach(DynamicAutoFrequency.allCases) { Text($0.title).tag($0) }
+                }
+                .tint(Palette.accent)
+            }
+            if model.dynamicAutoFrequency == .off {
+                TextField(L("例如：湖邊的小木屋與松林"), text: $prompt, axis: .vertical)
+                    .lineLimit(2...4).focused($focused)
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.trackFill))
+            } else {
+                Text(model.dynamicAutoFrequency == .daily
+                     ? L("AI 每天依季節挑一個新場景，打開 App 時自動生成四時段，完成後直接換上。")
+                     : L("AI 每週依季節挑一個新場景，打開 App 時自動生成四時段，完成後直接換上。"))
+                    .font(.subheadline).fixedSize(horizontal: false, vertical: true)
+                Text(L("每組 4 次圖片生成，使用你的 OpenAI API 額度。"))
+                    .font(.footnote).foregroundStyle(.secondary)
+                if let state = model.dynamicAutoState {
+                    Text(state.completed ? L("上一組：\(state.prompt)")
+                         : state.attempts >= DynamicAutoState.maxAttempts ? L("這一期未完成：\(state.prompt)")
+                         : L("進行中：\(state.prompt)"))
+                        .font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
             if let step = model.sceneProgress {
                 ProgressView(value: Double(step), total: 4) {
                     Text(L("生成中：\(step)／4")).font(.footnote).monospacedDigit()
                 }
                 .tint(Palette.accent)
             }
-            Button {
-                focused = false
-                let text = prompt
-                Task { await model.generateScene(text) }
-            } label: {
-                Label(L("生成日夜桌布（4 張）"), systemImage: "sparkles").frame(maxWidth: .infinity)
+            if model.dynamicAutoFrequency == .off {
+                Button {
+                    focused = false
+                    let text = prompt
+                    Task { await model.generateScene(text) }
+                } label: {
+                    Label(L("生成日夜桌布（4 張）"), systemImage: "sparkles").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.sceneProgress != nil)
+            } else {
+                Button {
+                    Task { await model.generateAutoSceneNow() }
+                } label: {
+                    Label(L("現在用 AI 生成一組"), systemImage: "sparkles").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(model.sceneProgress != nil)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.sceneProgress != nil)
             if let error = model.sceneError {
                 Text(error).font(.footnote).foregroundStyle(Palette.orange)
             }

@@ -756,6 +756,7 @@ enum SelfTest {
 
         // 16) 標籤、解析度、多選、刪除計畫、移到垃圾桶
         await runLibraryTests(tempRoot: tempRoot, defaults: testDefaults, record: record)
+        await runVarietyTests(tempRoot: tempRoot, defaults: testDefaults, record: record)
 
         // 15) 確認自我測試沒有動到桌布
 

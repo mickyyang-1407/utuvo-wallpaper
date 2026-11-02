@@ -27,6 +27,8 @@ targets:
         group: Shared
       - path: ../Sources/DynamicSchedule.swift
         group: Shared
+      - path: ../Sources/DynamicAuto.swift
+        group: Shared
       - path: Resources
       - path: Localization
         excludes:

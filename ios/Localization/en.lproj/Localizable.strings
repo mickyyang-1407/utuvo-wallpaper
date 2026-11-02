@@ -81,7 +81,6 @@
 "未選取" = "Nothing selected";
 "查看" = "View";
 "極簡" = "Minimal";
-"每天最多一批 10 張、10 種不同主題。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。" = "At most one batch of 10 a day, in 10 different themes. Checked when you open the app; iOS may also finish it overnight, with no guaranteed time. With no favorites, all wallpapers rotate.";
 "每日自動生成" = "Daily Generation";
 "每日自動生成已開啟" = "Daily generation is on";
 "每日自動生成未開啟" = "Daily generation is off";
@@ -120,16 +119,16 @@
 "實測失敗：%@" = "Test failed: %@";
 "實測完成：%lld 張已加入圖庫。" = "Test done: %lld added to the library.";
 "實測生成中（1 張）…" = "Test generation in progress (1 image)…";
-"破曉山稜" = "Ridge at Dawn";
-"紙上遠山" = "Paper Mountains";
+"自然風景" = "Landscape";
+"紙雕極簡" = "Paper Minimal";
 "流動光帶" = "Flowing Ribbons";
-"黃昏街角" = "Dusk Street Corner";
-"星雲深處" = "Deep Nebula";
-"葉脈微距" = "Leaf Vein Macro";
-"田園午後" = "Meadow Afternoon";
-"沙色拱廊" = "Sand Arcade";
-"海邊車站" = "Seaside Station";
-"潮汐漸層" = "Tidal Gradient";
+"插畫街景" = "Illustrated Streets";
+"深空" = "Deep Space";
+"自然微距" = "Nature Macro";
+"水彩風景" = "Watercolor Scenes";
+"建築光影" = "Architecture";
+"手繪動畫" = "Hand-drawn Scenes";
+"柔和漸層" = "Soft Gradient";
 "流光" = "Flowing Light";
 "湖畔晨光" = "Lakeside Morning";
 "紙上山丘" = "Paper Hills";
@@ -164,3 +163,22 @@
 "沒有位置權限，改用時區推估" = "No location access; using time zone";
 "沒有位置權限，沿用上次的位置" = "No location access; using your last location";
 "取不到新位置，沿用上次的位置" = "Couldn’t update location; using your last location";
+
+/* 2026-11-02 每日變化、自選風格、日夜 AI 自動 */
+"%lld 種風格" = "%lld styles";
+"AI 每天依季節挑一個新場景，打開 App 時自動生成四時段，完成後直接換上。" = "Every day, AI picks a new seasonal scene and creates all four times of day when you open the app, then switches to it.";
+"AI 每週依季節挑一個新場景，打開 App 時自動生成四時段，完成後直接換上。" = "Every week, AI picks a new seasonal scene and creates all four times of day when you open the app, then switches to it.";
+"AI 自動・每天" = "AI · Daily";
+"AI 自動・每週" = "AI · Weekly";
+"上一組：%@" = "Last scene: %@";
+"例如：台北的老公寓陽台" = "e.g. an old Taipei apartment balcony";
+"全部風格" = "All Styles";
+"場景來源" = "Scene Source";
+"每組 4 次圖片生成，使用你的 OpenAI API 額度。" = "Each scene uses 4 image generations from your OpenAI API credits.";
+"每天最多一批 10 張，每天換主題、配色、光線與構圖；寫了自己的想法就每張都畫它。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。" = "Up to one batch of 10 per day, with new subjects, palettes, light and composition each day; if you write your own idea, every image paints it. Checked when you open the app; the system may also finish overnight, but timing isn't guaranteed. Without favorites, all wallpapers are used.";
+"現在用 AI 生成一組" = "Generate an AI Scene Now";
+"自己描述" = "Describe My Own";
+"自己的想法（選填）" = "Your Idea (Optional)";
+"這一期未完成：%@" = "Not finished this time: %@";
+"進行中：%@" = "In progress: %@";
+"風格" = "Style";

@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// 每日批次：每天最多一批 10 張不同主題（沿用 Mac `PromptTemplate.rotated` 輪替選題）。
+/// 每日批次：每天最多一批 10 張（與 Mac 共用 `DailyPlan`：每天換主題、配色、光線、構圖，可選風格或自己的想法）。
 /// 共用 `DailyBatch` 做進度檔：請求前先記次數；暫時性錯誤最多 3 次、60 秒／300 秒冷卻。
 struct DailyGenerationService: Sendable {
     static let batchSize = 10
@@ -9,21 +9,23 @@ struct DailyGenerationService: Sendable {
     let paths: AppPaths
     let target: CGSize
     var now: @Sendable () -> Date = { Date() }
+    var recipe = DailyRecipe()
 
     func run(day: String, count: Int = DailyGenerationService.batchSize,
              progress: @Sendable (Int, Int) -> Void = { _, _ in }) async throws -> [GeneratedWallpaper] {
         guard count > 0 else { throw GenerationError.emptyPrompt }
         paths.prepare()
-        let templates = PromptTemplate.rotated(count: count)
-        var batch = try DailyBatch.prepare(root: paths.root, day: day, count: count)
+        var batch = try DailyBatch.prepare(root: paths.root, day: day, count: count,
+                                           plan: DailyPlan.make(day: day, count: count, recipe: recipe))
+        let plan = batch.prompts(day: day)
         var results = batch.completed
         progress(results.count, count)
 
         for index in results.count..<count {
             try Task.checkCancellation()
-            let template = templates[index]
-            let nativeURL = paths.originals.appendingPathComponent("\(template.id)-daily-\(day).png")
-            let wallpaperURL = paths.wallpapers.appendingPathComponent("\(template.id)-daily-\(day).jpg")
+            let planned = plan[index]
+            let nativeURL = paths.originals.appendingPathComponent("\(planned.slug)-daily-\(day).png")
+            let wallpaperURL = paths.wallpapers.appendingPathComponent("\(planned.slug)-daily-\(day).jpg")
 
             let png: Data
             if FileManager.default.fileExists(atPath: nativeURL.path) {
@@ -35,7 +37,7 @@ struct DailyGenerationService: Sendable {
                 batch.retryAfter = now().addingTimeInterval(300)
                 try batch.save(root: paths.root, day: day)
                 do {
-                    png = try await provider.generateImage(prompt: PortraitPrompt.convert(template.prompt))
+                    png = try await provider.generateImage(prompt: PortraitPrompt.convert(planned.prompt))
                 } catch {
                     batch.retryAfter = DailyBatch.isRetryable(error) && batch.attempts[index] < 3
                         ? now().addingTimeInterval(batch.attempts[index] == 1 ? 60 : 300) : nil
@@ -51,7 +53,7 @@ struct DailyGenerationService: Sendable {
             try ImageProcessing.write(jpeg, to: wallpaperURL)
 
             results.append(GeneratedWallpaper(
-                title: template.title,
+                title: planned.title,
                 nativeURL: nativeURL.lastPathComponent,
                 nativePixelSize: CropMath.label(size),
                 wallpaperURL: wallpaperURL.lastPathComponent,

@@ -112,6 +112,8 @@ final class AppModel {
         self.rotationMode = preferences.string(forKey: "rotation.mode").flatMap(RotationController.Mode.init(rawValue:)) ?? .off
         self.rotationFavoritesOnly = preferences.bool(forKey: "rotation.favoritesOnly")
         self.rotationPerDisplay = preferences.bool(forKey: "rotation.perDisplay")
+        self.dailyRecipe = DailyRecipe.load(preferences)
+        self.dynamicAutoFrequency = DynamicAutoFrequency.load(preferences)
         self.isRotationPaused = preferences.bool(forKey: "rotation.paused")
         self.targetDisplayID = (preferences.object(forKey: "rotation.displayID") as? NSNumber)?.uint32Value
         self.rotation.onTick = { [weak self] in self?.rotationTick() }
@@ -607,6 +609,11 @@ final class AppModel {
 
     var isDynamicActive: Bool { preferences.bool(forKey: "dynamic.enabled") }
 
+    /// 每日 10 張用哪些風格、自己的想法。新的一批才生效，進行中的批次照原計畫。
+    var dailyRecipe = DailyRecipe() { didSet { dailyRecipe.save(preferences) } }
+    /// 日夜 AI 自動：每天／每週自動挑場景生成。
+    var dynamicAutoFrequency = DynamicAutoFrequency.off { didSet { dynamicAutoFrequency.save(preferences) } }
+
     /// 背景正在用的場景目錄（日夜模式啟用時）。
     var activeDynamicDirectory: URL? {
         guard isDynamicActive else { return nil }
@@ -616,19 +623,48 @@ final class AppModel {
     /// 四時段生成進度：已完成幾步（順序 白天 → 清晨 → 黃昏 → 夜晚）。
     private(set) var dynamicStepsDone = 0
 
+    /// 日夜生成用的圖片來源；自測換成假的，不打真 API。
+    var sceneProviderFactory: @MainActor () throws -> any SceneImageProvider = {
+        guard let key = CredentialStore.load() else { throw GenerationError.missingCredential }
+        return OpenAIImageProvider(apiKey: key)
+    }
+
     func startDynamicGeneration(prompt: String) {
         guard !isGenerating else { return }
         do {
             let prompt = try OpenAIImageProvider.validatePrompt(prompt)
-            guard let lease = try FileLease.acquire(at: outputRoot.appendingPathComponent(".generation.lock")) else {
-                errorMessage = L("背景或另一個視窗正在生成，請稍後再試。"); return
-            }
-            guard let key = CredentialStore.load() else { throw GenerationError.missingCredential }
             if sceneWorkPrompt != prompt {
                 sceneWorkDirectory = outputRoot.appendingPathComponent("dynamic/scenes/\(UUID().uuidString)")
                 sceneWorkPrompt = prompt
             }
-            let directory = sceneWorkDirectory!
+            runSceneGeneration(prompt: prompt, directory: sceneWorkDirectory!, onSuccess: { _ in
+                self.statusMessage = L("四時段 6K 已生成。可預覽，再設定為日夜桌布。")
+                self.sceneWorkDirectory = nil
+                self.sceneWorkPrompt = nil
+            }, onFailure: { error in
+                if error is CancellationError { self.statusMessage = L("已取消；已下載的時段保留，可用相同描述續作。") }
+                else {
+                    self.errorMessage = error.localizedDescription
+                    self.statusMessage = L("日夜生成未完成；相同描述重試會保留已完成時段。")
+                }
+            })
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// 四時段生成共用流程：拿生成鎖 → 生成 → 發布。回傳是否真的開始。
+    @discardableResult
+    private func runSceneGeneration(prompt: String, directory: URL,
+                                    beforeStart: (() throws -> Void)? = nil,
+                                    onSuccess: @escaping @MainActor (GeneratedScene) async -> Void,
+                                    onFailure: @escaping @MainActor (Error) -> Void) -> Bool {
+        guard !isGenerating else { return false }
+        do {
+            guard let lease = try FileLease.acquire(at: outputRoot.appendingPathComponent(".generation.lock")) else {
+                errorMessage = L("背景或另一個視窗正在生成，請稍後再試。"); return false
+            }
+            let provider = try sceneProviderFactory()
+            // 付費請求送出前的最後一步（自動場景在這裡記次數）。
+            try beforeStart?()
             generationLease = lease
             isGenerating = true
             errorMessage = nil
@@ -637,7 +673,7 @@ final class AppModel {
             generationTask = Task {
                 defer { isGenerating = false; generationLease = nil; generationProgress = "" }
                 do {
-                    let scene = try await DynamicGenerator(provider: OpenAIImageProvider(apiKey: key))
+                    let scene = try await DynamicGenerator(provider: provider)
                         .generate(prompt: prompt, directory: directory) { count in
                             Task { @MainActor in
                                 self.generationProgress = L("已完成 \(count)／4 個時段")
@@ -646,16 +682,71 @@ final class AppModel {
                         }
                     try scene.publish()
                     dynamicRevision += 1
-                    statusMessage = L("四時段 6K 已生成。可預覽，再設定為日夜桌布。")
-                    sceneWorkDirectory = nil
-                    sceneWorkPrompt = nil
-                } catch is CancellationError { statusMessage = L("已取消；已下載的時段保留，可用相同描述續作。") }
-                catch {
-                    errorMessage = error.localizedDescription
-                    statusMessage = L("日夜生成未完成；相同描述重試會保留已完成時段。")
-                }
+                    await onSuccess(scene)
+                } catch { onFailure(error) }
             }
-        } catch { errorMessage = error.localizedDescription }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    // MARK: - 日夜 AI 自動
+
+    private var dynamicAutoURL: URL { outputRoot.appendingPathComponent("dynamic/auto.json") }
+    var dynamicAutoState: DynamicAutoState? { DynamicAutoState.load(from: dynamicAutoURL) }
+
+    private var plannerContext: (southern: Bool, chinese: Bool) {
+        let southern = DynamicTiming.load(preferences) == .solar && Coordinate.load(preferences).0.latitude < 0
+        let chinese = (Locale.preferredLanguages.first ?? "").hasPrefix("zh")
+        return (southern, chinese)
+    }
+
+    /// 排程檢查（背景每分鐘）：這一期還沒做就挑場景生成。缺 key 不記次數。
+    func checkDynamicAuto(now: Date = Date()) {
+        guard !backgroundManaged, !isGenerating, dynamicAutoFrequency != .off else { return }
+        let context = plannerContext
+        guard let state = DynamicAutoPlanner.due(state: dynamicAutoState, now: now, frequency: dynamicAutoFrequency,
+                                                 southern: context.southern, chinese: context.chinese) else { return }
+        guard credentialAvailable() else { return }
+        startAutoScene(state)
+    }
+
+    /// 「現在用 AI 生成一組」。
+    func generateAutoSceneNow(now: Date = Date()) {
+        guard !isGenerating else { return }
+        let context = plannerContext
+        startAutoScene(DynamicAutoPlanner.manual(state: dynamicAutoState, now: now, frequency: dynamicAutoFrequency,
+                                                 southern: context.southern, chinese: context.chinese))
+    }
+
+    private func startAutoScene(_ state: DynamicAutoState) {
+        var state = state
+        let url = dynamicAutoURL
+        let directory = outputRoot.appendingPathComponent("dynamic/scenes/\(state.sceneID)")
+        runSceneGeneration(prompt: state.prompt, directory: directory, beforeStart: {
+            state.attempts += 1
+            state.retryAfter = nil
+            try state.save(to: url)
+        }, onSuccess: { _ in
+            state.recordSuccess()
+            try? state.save(to: url)
+            self.statusMessage = L("AI 已生成新的日夜場景：\(state.prompt)")
+            // 日夜模式開著就直接換成新場景；沒開只放進場景庫。
+            if self.isDynamicActive {
+                self.preferences.set(directory.path, forKey: "dynamic.activeDirectory")
+                self.preferences.removeObject(forKey: "dynamic.lastApplied")
+                await self.performBackgroundRotation(at: Date())
+            }
+        }, onFailure: { error in
+            state.recordFailure(retryable: error is CancellationError || DailyBatch.isRetryable(error), now: Date())
+            try? state.save(to: url)
+            if !(error is CancellationError) {
+                self.errorMessage = error.localizedDescription
+                self.statusMessage = L("AI 日夜場景未完成；已完成的時段保留，稍後自動續作。")
+            }
+        })
     }
 
     // MARK: - 生成
@@ -678,14 +769,16 @@ final class AppModel {
             errorMessage = L("無法取得生成工作鎖，請確認資料夾可以寫入。")
             return false
         }
-        guard let service = try? serviceFactory() else {
+        guard var service = try? serviceFactory() else {
             errorMessage = GenerationError.missingCredential.localizedDescription
             return false
         }
+        service.recipe = dailyRecipe
         let batchDay = dailyAttempt ? DailyScheduler.dayKey(Date()) : nil
         if let day = batchDay {
             guard !daily.alreadyAttempted() || DailyBatch.canResume(root: outputRoot, day: day) else { return false }
-            do { _ = try DailyBatch.prepare(root: outputRoot, day: day, count: count) }
+            do { _ = try DailyBatch.prepare(root: outputRoot, day: day, count: count,
+                                            plan: DailyPlan.make(day: day, count: count, recipe: dailyRecipe)) }
             catch { errorMessage = L("每日進度無法讀取或儲存，已停止以避免重複生成。"); return false }
             daily.markAttempt()
         }
@@ -771,7 +864,7 @@ final class AppModel {
 
     private func startDailyTimer() {
         let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.checkDaily() }
+            MainActor.assumeIsolated { self?.checkDaily(); self?.checkDynamicAuto() }
         }
         RunLoop.main.add(timer, forMode: .common)
         dailyTimer = timer

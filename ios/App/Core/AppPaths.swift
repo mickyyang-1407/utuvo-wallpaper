@@ -14,6 +14,7 @@ struct AppPaths: Sendable {
     var dynamic: URL { root.appendingPathComponent("dynamic", isDirectory: true) }
     var demoCache: URL { root.appendingPathComponent("demo-cache", isDirectory: true) }
     var currentScenePointer: URL { dynamic.appendingPathComponent("current.json") }
+    var dynamicAutoState: URL { dynamic.appendingPathComponent("auto.json") }
 
     /// 建立資料夾；originals 不進 iCloud／裝置備份（體積大、可重新生成）。
     func prepare() {

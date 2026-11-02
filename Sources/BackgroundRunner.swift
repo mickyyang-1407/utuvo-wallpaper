@@ -45,6 +45,8 @@ enum BackgroundRunner {
             var snapshot = BackgroundSnapshot.load() ?? BackgroundSnapshot()
             if model.isDynamicActive { await model.performBackgroundRotation(at: Date()) }
             model.checkDaily()
+            // 每日批次先跑；這一分鐘沒在生成才輪到日夜 AI 自動。
+            model.checkDynamicAuto()
             let attempted = model.isGenerating
             if attempted { snapshot.error = nil }
             while model.isGenerating {

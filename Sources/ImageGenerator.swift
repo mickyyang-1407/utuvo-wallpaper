@@ -139,6 +139,8 @@ struct GeneratedWallpaper: Sendable, Codable {
 /// 生成服務：手動與每日排程共用同一條路徑。
 struct GenerationService: Sendable {
     let provider: ImageProvider
+    /// 每日風格／自己的想法（AppModel 從偏好設定帶入）。
+    var recipe = DailyRecipe()
 
     /// 產生 `count` 張。每完成一張立刻寫檔，不覆蓋既有檔案。
     /// - Parameters:
@@ -149,18 +151,24 @@ struct GenerationService: Sendable {
                   batchDay: String? = nil,
                   progress: @Sendable (Int, Int) -> Void) async throws -> [GeneratedWallpaper] {
         guard count > 0 else { throw GenerationError.emptyPrompt }
-        let templates = PromptTemplate.rotated(count: count)
-        var batch = try batchDay.map { try DailyBatch.prepare(root: outputRoot, day: $0, count: count) }
+        var batch = try batchDay.map {
+            try DailyBatch.prepare(root: outputRoot, day: $0, count: count,
+                                   plan: DailyPlan.make(day: $0, count: count, recipe: recipe))
+        }
+        // 手動生成每次都換一組（加上隨機 salt）。
+        let plan = batch.map { $0.prompts(day: batchDay!) }
+            ?? DailyPlan.make(day: DynamicAutoPlanner.period(for: Date(), frequency: .daily) ?? "manual",
+                              count: count, recipe: recipe, salt: UUID().uuidString)
         var results: [GeneratedWallpaper] = batch?.completed ?? []
         progress(results.count, count)
 
         for index in results.count..<count {
             try Task.checkCancellation()
-            let template = templates[index]
-            LabLog.generate.info("generating image \(index + 1)/\(count) template=\(template.id, privacy: .public)")
+            let planned = plan[index]
+            LabLog.generate.info("generating image \(index + 1)/\(count) template=\(planned.slug, privacy: .public)")
 
             let id = batchDay.map { "daily-" + $0 } ?? RandomID.make()
-            let slug = template.id
+            let slug = planned.slug
             let originalsDir = outputRoot.appendingPathComponent("originals", isDirectory: true)
             let wallpapersDir = outputRoot.appendingPathComponent("wallpapers", isDirectory: true)
             let nativeURL = originalsDir.appendingPathComponent("\(slug)-\(id).png")
@@ -176,7 +184,7 @@ struct GenerationService: Sendable {
                     batch!.retryAfter = Date().addingTimeInterval(300)
                     try batch!.save(root: outputRoot, day: day)
                 }
-                do { png = try await provider.generateImage(prompt: template.prompt) }
+                do { png = try await provider.generateImage(prompt: planned.prompt) }
                 catch {
                     if let day = batchDay {
                         batch!.retryAfter = DailyBatch.isRetryable(error) && batch!.attempts[index] < 3
@@ -211,7 +219,7 @@ struct GenerationService: Sendable {
             ], beside: wallpaperURL)
 
             results.append(GeneratedWallpaper(
-                title: template.title,
+                title: planned.title,
                 nativeURL: nativeURL.path,
                 nativePixelSize: "\(Int(size.width)) × \(Int(size.height))",
                 wallpaperURL: wallpaperURL.path,
