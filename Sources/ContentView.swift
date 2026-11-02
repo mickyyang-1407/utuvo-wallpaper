@@ -242,7 +242,7 @@ struct ContentView: View {
                 pendingTrash = nil
             } onCancel: { pendingTrash = nil }
         }
-        .onAppear { installKeyMonitor() }
+        .onAppear { installKeyMonitor(); openScreenshotState() }
         .onDisappear { if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }; keyMonitor = nil }
         .onReceive(NotificationCenter.default.publisher(for: .wallpaperOpenSettings)) { _ in showSettings = true }
         .onChange(of: section) { _, _ in
@@ -1335,6 +1335,20 @@ struct ContentView: View {
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
         .aspectRatio(16.0 / 9, contentMode: .fit)
+    }
+
+    /// 宣傳截圖用：啟動參數 `-UTUVOShowcase generate|preview|dynamic|schedule` 直接打開該畫面（不帶參數時不做事）。
+    private func openScreenshotState() {
+        guard let state = UserDefaults.standard.string(forKey: "UTUVOShowcase") else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            switch state {
+            case "generate": showGeneration = true
+            case "schedule": showSchedule = true
+            case "dynamic": section = .section(.dynamic)
+            case "preview": if let first = visibleWallpapers.first { openPreview(first) }
+            default: break
+            }
+        }
     }
 
     // MARK: - 大圖預覽
