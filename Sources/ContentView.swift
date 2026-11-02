@@ -1311,7 +1311,15 @@ struct ContentView: View {
             }
             Text("原生 3840 × 2160，另存 6144 × 3456 的 6K 重採樣版本。使用現有 API 憑證。")
                 .font(.caption).foregroundStyle(WallpaperPalette.secondaryText).fixedSize(horizontal: false, vertical: true)
-            Text("10 張會使用 10 種不同風格／主題。").font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
+            LabeledContent("分類") { categoryMenu($model.manualRecipe) }
+            TextField("自己的 Prompt（選填）", text: Binding(get: { model.manualRecipe.idea },
+                                                          set: { model.manualRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
+                      prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
+                .lineLimit(2...4).textFieldStyle(.roundedBorder)
+            Text(model.manualRecipe.trimmedIdea.isEmpty
+                 ? "每張換主題、配色、光線與構圖。"
+                 : "每張都畫你的 Prompt，用選的分類輪流表現。")
+                .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
             if model.isGenerating {
                 ProgressView().controlSize(.small)
                 Text(model.generationProgress).font(.callout)
@@ -1343,14 +1351,14 @@ struct ContentView: View {
                 Picker("張數", selection: Binding(get: { model.dailyMode }, set: { model.setDailyMode($0) })) {
                     ForEach(DailyScheduler.Mode.allCases) { Text($0.title).tag($0) }
                 }
-                LabeledContent("風格") { dailyStyleMenu }
-                TextField("自己的想法（選填）", text: Binding(get: { model.dailyRecipe.idea },
+                LabeledContent("分類") { categoryMenu($model.dailyRecipe) }
+                TextField("自己的 Prompt（選填）", text: Binding(get: { model.dailyRecipe.idea },
                                                      set: { model.dailyRecipe.idea = String($0.prefix(DailyRecipe.ideaLimit)) }),
                           prompt: Text("例如：台北的老公寓陽台"), axis: .vertical)
                     .lineLimit(1...3)
                 Text(model.dailyRecipe.trimmedIdea.isEmpty
                      ? "每天換主題、配色、光線與構圖。"
-                     : "每張都畫你的想法，用選的風格輪流表現。")
+                     : "每張都畫你的 Prompt，用選的分類輪流表現。")
                     .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
                 Text("設定會保留。每天最多一批，使用 API 額度。要在關閉視窗後繼續，請到設定啟用背景服務；背景只輪換 6K 成品。")
                     .font(.caption).foregroundStyle(WallpaperPalette.secondaryText)
@@ -1360,23 +1368,20 @@ struct ContentView: View {
         .formStyle(.grouped).frame(width: 400, height: 660)
     }
 
-    /// 每日風格多選：全部或挑幾種。
-    private var dailyStyleMenu: some View {
-        let selected = model.dailyRecipe.styles
+    /// 分類多選（與側欄分類相同）：全部或挑幾種。每日排程與手動產生共用這個選單。
+    private func categoryMenu(_ recipe: Binding<DailyRecipe>) -> some View {
+        let selected = recipe.wrappedValue.categories
         return Menu {
-            Button("全部風格") { model.dailyRecipe.styles = [] }
+            Button("全部分類") { recipe.wrappedValue.styles = [] }
             Divider()
-            ForEach(PromptTemplate.shared) { template in
-                Toggle(templateDisplayTitle(template.id) ?? template.id, isOn: Binding(
-                    get: { selected.contains(template.id) },
-                    set: { on in
-                        var styles = model.dailyRecipe.styles
-                        if on { styles.append(template.id) } else { styles.removeAll { $0 == template.id } }
-                        model.dailyRecipe.styles = PromptTemplate.shared.map(\.id).filter(styles.contains)
-                    }))
+            ForEach(DailyRecipe.categories, id: \.self) { category in
+                Toggle(categoryTitle(category), isOn: Binding(
+                    get: { selected.contains(category) },
+                    set: { recipe.wrappedValue.setCategory(category, on: $0) }))
             }
         } label: {
-            Text(selected.isEmpty ? L("全部風格") : L("\(selected.count) 種風格"))
+            Text(selected.isEmpty ? L("全部分類")
+                 : selected.count == 1 ? categoryTitle(selected[0]) : L("\(selected.count) 個分類"))
         }
         .fixedSize()
     }

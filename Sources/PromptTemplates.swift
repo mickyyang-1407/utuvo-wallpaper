@@ -160,20 +160,40 @@ struct DailyRecipe: Equatable, Sendable {
     static let stylesKey = "daily.styles"
     static let ideaKey = "daily.idea"
     static let ideaLimit = 200
+    /// 手動「產生桌布」另存一組，不影響每日排程。
+    static let manualPrefix = "manual"
 
     /// 選了哪些風格（範本 id）；空＝全部。
     var styles: [String] = []
     /// 自己的想法：有寫就當每張的主題，用選的風格畫出來。
     var idea = ""
 
-    static func load(_ defaults: UserDefaults = .standard) -> Self {
+    static func load(_ defaults: UserDefaults = .standard, prefix: String = "daily") -> Self {
         let known = Set(PromptTemplate.shared.map(\.id))
-        let styles = (defaults.stringArray(forKey: stylesKey) ?? []).filter(known.contains)
-        return Self(styles: styles, idea: defaults.string(forKey: ideaKey) ?? "")
+        let styles = (defaults.stringArray(forKey: prefix + ".styles") ?? []).filter(known.contains)
+        return Self(styles: styles, idea: defaults.string(forKey: prefix + ".idea") ?? "")
     }
-    func save(_ defaults: UserDefaults = .standard) {
-        defaults.set(styles, forKey: Self.stylesKey)
-        defaults.set(String(idea.prefix(Self.ideaLimit)), forKey: Self.ideaKey)
+    func save(_ defaults: UserDefaults = .standard, prefix: String = "daily") {
+        defaults.set(styles, forKey: prefix + ".styles")
+        defaults.set(String(idea.prefix(Self.ideaLimit)), forKey: prefix + ".idea")
+    }
+
+    /// 分類（與圖庫側欄相同順序）；一個分類可能對應多個風格。
+    static var categories: [String] {
+        var seen = Set<String>()
+        return PromptTemplate.shared.map(\.category).filter { seen.insert($0).inserted }
+    }
+    /// 選了哪些分類（空＝全部）。
+    var categories: [String] {
+        Self.categories.filter { category in
+            PromptTemplate.shared.contains { $0.category == category && styles.contains($0.id) }
+        }
+    }
+    mutating func setCategory(_ category: String, on: Bool) {
+        let ids = PromptTemplate.shared.filter { $0.category == category }.map(\.id)
+        var next = styles.filter { !ids.contains($0) }
+        if on { next += ids }
+        styles = PromptTemplate.shared.map(\.id).filter(next.contains)
     }
 
     var templates: [PromptTemplate] {

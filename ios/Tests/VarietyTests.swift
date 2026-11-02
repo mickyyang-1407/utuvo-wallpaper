@@ -63,6 +63,17 @@ final class VarietyTests: XCTestCase {
         XCTAssertTrue(resumed.prompts.allSatisfy { $0.contains("雨後的竹林") }, "\(resumed.prompts)")
     }
 
+    func testCategorySelectionMapsToStyles() {
+        var recipe = DailyRecipe()
+        recipe.setCategory("抽象", on: true)
+        XCTAssertEqual(recipe.categories, ["抽象"])
+        XCTAssertTrue(recipe.templates.allSatisfy { $0.category == "抽象" })
+        XCTAssertEqual(recipe.templates.count, PromptTemplate.shared.filter { $0.category == "抽象" }.count)
+        recipe.setCategory("抽象", on: false)
+        XCTAssertTrue(recipe.styles.isEmpty)
+        XCTAssertEqual(DailyRecipe.categories.first, "自然")
+    }
+
     func testRecipePersistsInDefaults() {
         let defaults = UserDefaults(suiteName: "test.recipe.\(UUID().uuidString)")!
         DailyRecipe(styles: ["cosmic-nebula", "bogus"], idea: "城市夜景").save(defaults)

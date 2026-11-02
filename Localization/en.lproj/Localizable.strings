@@ -7,7 +7,6 @@
 "%lld 顆設定失敗" = "%lld failed";
 "1 張" = "1 picture";
 "10 張" = "10 pictures";
-"10 張會使用 10 種不同風格／主題。" = "10 pictures use 10 different styles and themes.";
 "4 個時段" = "4 times of day";
 "4 個時段 · %@" = "4 times of day · %@";
 "5 張" = "5 pictures";
@@ -375,7 +374,6 @@
 "正在換桌布，請稍後再試。" = "Changing the wallpaper right now. Try again in a moment.";
 
 /* 2026-11-02 每日變化、自選風格、日夜 AI 自動 */
-"%lld 種風格" = "%lld styles";
 "AI 已生成新的日夜場景：%@" = "AI created a new day & night scene: %@";
 "AI 日夜場景未完成；已完成的時段保留，稍後自動續作。" = "AI day & night scene not finished; completed times are kept and it will resume automatically.";
 "AI 每天依季節挑一個新場景，自動生成四時段；日夜模式開著會直接換上。" = "Every day, AI picks a new seasonal scene and creates all four times of day; if Day & Night is on, it switches to it.";
@@ -384,14 +382,14 @@
 "AI 自動・每週" = "AI · Weekly";
 "上一組：%@" = "Last scene: %@";
 "例如：台北的老公寓陽台" = "e.g. an old Taipei apartment balcony";
-"全部風格" = "All Styles";
 "場景來源" = "Scene Source";
 "每天換主題、配色、光線與構圖。" = "Subject, palette, light and composition change every day.";
-"每張都畫你的想法，用選的風格輪流表現。" = "Every image paints your idea, in the styles you picked.";
 "每組 4 次圖片生成，使用你的 OpenAI API 額度。需要背景服務或保持 App 開著。" = "Each scene uses 4 image generations from your OpenAI API credits. Needs the background service or the app left open.";
 "現在用 AI 生成一組" = "Generate an AI Scene Now";
 "自己描述" = "Describe My Own";
-"自己的想法（選填）" = "Your Idea (Optional)";
 "這一期未完成：%@" = "Not finished this time: %@";
 "進行中：%@" = "In progress: %@";
-"風格" = "Style";
+"全部分類" = "All Categories";
+"每張換主題、配色、光線與構圖。" = "Each image changes subject, palette, light and composition.";
+"每張都畫你的 Prompt，用選的分類輪流表現。" = "Every image paints your prompt, rotating through the categories you picked.";
+"自己的 Prompt（選填）" = "Your Prompt (Optional)";

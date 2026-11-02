@@ -93,6 +93,43 @@ extension SelfTest {
             record("每日批次：計畫存進進度檔，送出的就是計畫、檔名照 slug、續作不重送", false, "\(error)")
         }
 
+        // 分類：選「自然」＝兩個自然風格；取消後回到全部。
+        var byCategory = DailyRecipe()
+        byCategory.setCategory("自然", on: true)
+        let natureIDs = PromptTemplate.shared.filter { $0.category == "自然" }.map(\.id)
+        let natureOK = byCategory.styles == natureIDs && byCategory.categories == ["自然"]
+            && byCategory.templates.allSatisfy { $0.category == "自然" }
+        byCategory.setCategory("宇宙", on: true)
+        let twoOK = byCategory.categories == ["自然", "宇宙"]
+        byCategory.setCategory("自然", on: false); byCategory.setCategory("宇宙", on: false)
+        record("分類選單：選分類＝該分類所有風格，取消後回到全部", natureOK && twoOK && byCategory.styles.isEmpty
+               && byCategory.templates.count == PromptTemplate.shared.count, byCategory.styles.joined(separator: ","))
+
+        // 手動「產生桌布」用自己的分類與 Prompt，不吃每日排程的設定。
+        do {
+            let manualRoot = tempRoot.appendingPathComponent("manual-recipe", isDirectory: true)
+            let manualSuite = "selftest.manual.\(UUID().uuidString)"
+            let manualDefaults = UserDefaults(suiteName: manualSuite)!
+            defer { manualDefaults.removePersistentDomain(forName: manualSuite) }
+            let recorder = PromptRecorder(data: png)
+            let model = AppModel(desktop: FakeDesktop(), outputRoot: manualRoot,
+                                 serviceFactory: { GenerationService(provider: recorder) },
+                                 credentialAvailable: { true }, preferences: manualDefaults, isBackgroundWorker: true)
+            model.dailyRecipe = DailyRecipe(styles: [], idea: "每日的主題")
+            var manual = DailyRecipe(styles: [], idea: "手動的 Prompt：雨中的電話亭")
+            manual.setCategory("插畫", on: true)
+            model.manualRecipe = manual
+            let started = model.startGeneration(count: 2)
+            _ = await waitUntil({ !model.isGenerating }, timeout: 60)
+            let prompts = await recorder.prompts
+            let reloaded = DailyRecipe.load(manualDefaults, prefix: DailyRecipe.manualPrefix)
+            record("手動產生：用彈窗裡的分類＋自己的 Prompt，不影響每日設定、會記住",
+                   started && prompts.count == 2 && prompts.allSatisfy { $0.contains("雨中的電話亭") && !$0.contains("每日的主題") }
+                       && prompts.allSatisfy { $0.hasPrefix("Editorial illustration") } && reloaded == manual
+                       && DailyRecipe.load(manualDefaults).idea == "每日的主題",
+                   "送出 \(prompts.count) 張")
+        }
+
         let legacy = DailyPlan.legacy(day: "2026-11-02", count: 10)
         record("舊進度檔沒有計畫：檔名照舊輪替", legacy.map(\.slug) == PromptTemplate.rotated(count: 10).map(\.id), "")
 

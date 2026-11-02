@@ -113,6 +113,7 @@ final class AppModel {
         self.rotationFavoritesOnly = preferences.bool(forKey: "rotation.favoritesOnly")
         self.rotationPerDisplay = preferences.bool(forKey: "rotation.perDisplay")
         self.dailyRecipe = DailyRecipe.load(preferences)
+        self.manualRecipe = DailyRecipe.load(preferences, prefix: DailyRecipe.manualPrefix)
         self.dynamicAutoFrequency = DynamicAutoFrequency.load(preferences)
         self.isRotationPaused = preferences.bool(forKey: "rotation.paused")
         self.targetDisplayID = (preferences.object(forKey: "rotation.displayID") as? NSNumber)?.uint32Value
@@ -611,6 +612,8 @@ final class AppModel {
 
     /// 每日 10 張用哪些風格、自己的想法。新的一批才生效，進行中的批次照原計畫。
     var dailyRecipe = DailyRecipe() { didSet { dailyRecipe.save(preferences) } }
+    /// 手動「產生桌布」的分類與自己的 Prompt（與每日排程分開記）。
+    var manualRecipe = DailyRecipe() { didSet { manualRecipe.save(preferences, prefix: DailyRecipe.manualPrefix) } }
     /// 日夜 AI 自動：每天／每週自動挑場景生成。
     var dynamicAutoFrequency = DynamicAutoFrequency.off { didSet { dynamicAutoFrequency.save(preferences) } }
 
@@ -775,7 +778,7 @@ final class AppModel {
             errorMessage = GenerationError.missingCredential.localizedDescription
             return false
         }
-        service.recipe = dailyRecipe
+        service.recipe = dailyAttempt ? dailyRecipe : manualRecipe
         let batchDay = dailyAttempt ? DailyScheduler.dayKey(Date()) : nil
         if let day = batchDay {
             guard !daily.alreadyAttempted() || DailyBatch.canResume(root: outputRoot, day: day) else { return false }
