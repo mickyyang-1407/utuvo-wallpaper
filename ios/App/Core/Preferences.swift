@@ -25,7 +25,12 @@ struct Preferences {
         get { defaults.bool(forKey: "favoritesOnly") }
         nonmutating set { defaults.set(newValue, forKey: "favoritesOnly") }
     }
-    var rotationFrequency: RotationFrequency {
+    /// 實際回傳過的圖片 id（最多 30 筆），給「上一張」用。
+    var servedHistory: [String] {
+        get { defaults.stringArray(forKey: "servedHistory") ?? [] }
+        nonmutating set { defaults.set(Array(newValue.suffix(30)), forKey: "servedHistory") }
+    }
+        var rotationFrequency: RotationFrequency {
         get { defaults.string(forKey: "rotationFrequency").flatMap(RotationFrequency.init(rawValue:)) ?? .hourly }
         nonmutating set { defaults.set(newValue.rawValue, forKey: "rotationFrequency") }
     }

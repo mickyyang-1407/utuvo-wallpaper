@@ -47,12 +47,16 @@ enum WallpaperSelection {
         return hourSlot(year: c.year ?? 2001, month: c.month ?? 1, day: c.day ?? 1, hour: c.hour ?? 0) ?? 0
     }
 
-    /// 依頻率的時間格序號（當地時間，單調遞增）。everyRun 回 nil。
+    /// 依頻率的時間格序號（單調遞增）。everyRun 回 nil。
+    /// 一天以內的頻率用「絕對時間＋時區標準時差」算：秋天撥回那一小時兩次 01:30 會落在不同格；
+    /// 日光節約時差是整小時，整點邊界不受影響。每天則用當地日期。
     static func slot(at date: Date, frequency: RotationFrequency, calendar: Calendar = .current) -> Int? {
         guard let size = frequency.minutes else { return nil }
-        let minute = calendar.component(.minute, from: date)
-        let minutesSinceRef = hourSlot(at: date, calendar: calendar) * 60 + minute
-        return minutesSinceRef / size
+        if frequency == .daily { return hourSlot(at: date, calendar: calendar) / 24 }
+        let zone = calendar.timeZone
+        let standardOffset = zone.secondsFromGMT(for: date) - Int(zone.daylightSavingTimeOffset(for: date))
+        let minutes = Int((date.timeIntervalSinceReferenceDate + Double(standardOffset)) / 60)
+        return Int((Double(minutes) / Double(size)).rounded(.down))
     }
 
     /// 純函式：輸入上次狀態、這次的小時序號與張數 → 新狀態與索引。
@@ -102,11 +106,22 @@ enum WallpaperSelection {
             let favs = available.filter { favorites.contains($0) }
             if !favs.isEmpty { pool = favs }
         }
-        // everyRun：每次呼叫都前進（第一次也前進，用游標當格號）。
+        // everyRun：每次呼叫都換一格；第一次呼叫（還沒服務過）停在第一張。
         let slotValue = slot(at: date, frequency: frequency, calendar: calendar)
-        let result = slotValue.map { step(state, slot: $0, count: pool.count, force: force, delta: delta) }
-            ?? step(state, slot: state.cursor, count: pool.count, force: true, delta: force ? delta : 1)
+            ?? ((state.lastServedSlot ?? -1) + 1)
+        let result = step(state, slot: slotValue, count: pool.count, force: force, delta: delta)
         guard let index = result.index else { return (nil, state) }
         return (Choice(id: pool[index], source: .rotation(index)), result.state)
+    }
+
+    /// 「上一張」：已服務歷史最後一筆是目前這張，往前找第一筆不同、而且還在圖庫裡的。
+    static func previous(history: [String], available: Set<String>) -> (id: String, remaining: [String])? {
+        guard let current = history.last else { return nil }
+        var rest = Array(history.dropLast())
+        while let candidate = rest.last {
+            if candidate != current && available.contains(candidate) { return (candidate, rest) }
+            rest.removeLast()
+        }
+        return nil
     }
 }

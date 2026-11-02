@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "UTUVO Wallpaper";
 "NSPhotoLibraryAddUsageDescription" = "UTUVO Wallpaper 會把你選擇的桌布存到照片圖庫。";
+"NSLocationWhenInUseUsageDescription" = "UTUVO Wallpaper 用你的大約位置計算日出日落，讓日夜桌布準時切換。位置只存在這支 iPhone。";

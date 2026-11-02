@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "UTUVO Wallpaper";
 "NSPhotoLibraryAddUsageDescription" = "UTUVO Wallpaper saves the wallpapers you choose to your photo library.";
+"NSLocationWhenInUseUsageDescription" = "UTUVO Wallpaper uses your approximate location to work out sunrise and sunset so the day-and-night wallpaper switches on time. It stays on this iPhone.";

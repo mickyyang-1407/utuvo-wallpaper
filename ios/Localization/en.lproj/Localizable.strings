@@ -136,7 +136,6 @@
 "跟隨系統" = "System default";
 "關閉並重新開啟 App 後套用新語言。" = "Close and reopen the app to use the new language.";
 "上一張桌布" = "Previous Wallpaper";
-"今天：清晨 %@、白天 %@、黃昏 %@、夜晚 %@（依時區推估位置）" = "Today: dawn %@, day %@, dusk %@, night %@ (location estimated from your time zone)";
 "依日出日落" = "Sunrise & Sunset";
 "回到輪換中的上一張桌布並回傳圖片（會取消釘選）。" = "Goes back to the previous wallpaper in the rotation and returns the image (clears the pin).";
 "固定時間" = "Fixed Times";
@@ -156,3 +155,10 @@
 "淺色" = "Light";
 "跟著系統淺色／深色" = "Follow Light/Dark Appearance";
 "啟用後，「取得目前桌布」會依時段回傳：%@ 清晨、%@ 白天、%@ 黃昏、%@ 夜晚。" = "When on, “Get Current Wallpaper” returns dawn from %@, day from %@, dusk from %@ and night from %@.";
+"今天：清晨 %@、白天 %@、黃昏 %@、夜晚 %@" = "Today: dawn %@, day %@, dusk %@, night %@";
+"使用你的位置" = "Using your location";
+"使用目前位置" = "Use Current Location";
+"依時區推估位置" = "Estimated from time zone";
+"取不到位置，改用時區推估" = "Couldn’t get location; using time zone";
+"正在取得位置…" = "Getting location…";
+"沒有位置權限，改用時區推估" = "No location access; using time zone";

@@ -2,8 +2,8 @@ import Foundation
 
 /// 日夜場景什麼時候換時段。
 /// - fixed：固定 06／09／18／21（舊行為）。
-/// - solar：依所在地當天日出日落（清晨＝日出前 30 分起，白天＝日出後 1 小時起，黃昏＝日落前 1 小時起，夜晚＝日落後 30 分起）。
-///   偏移選這幾個，是因為 iPhone「捷徑」的日出／日落自動化只能選整數段的提前／延後。
+/// - solar：依所在地當天日出日落。清晨＝日出前 30 分起、夜晚＝日落後 30 分起；
+///   白天／黃昏在 Mac 是日出後／日落前 90 分，iPhone 是 1 小時（配合「捷徑」日出日落自動化能選的提前／延後）。
 /// - appearance：跟系統外觀，淺色＝白天、深色＝夜晚。
 enum DynamicTiming: String, CaseIterable, Identifiable, Sendable {
     case fixed, solar, appearance
@@ -114,14 +114,20 @@ struct DynamicSchedule: Sendable {
         DynamicSchedule(timing: DynamicTiming.load(defaults), coordinate: Coordinate.load(defaults).0)
     }
 
+    #if os(iOS)
+    static let daySideOffset = 60
+    #else
+    static let daySideOffset = 90
+    #endif
+
     static let fixedStarts: [DynamicPhase: Int] = [.dawn: 6 * 60, .day: 9 * 60, .dusk: 18 * 60, .night: 21 * 60]
 
     /// 當天四個起點；solar 算不出來（極晝極夜）或時段擠在一起時退回固定時間。
     func starts(on date: Date, calendar: Calendar = .current) -> [DynamicPhase: Int] {
         guard timing == .solar,
               let sun = SolarCalculator.sunriseSunset(on: date, at: coordinate, calendar: calendar) else { return Self.fixedStarts }
-        let starts: [DynamicPhase: Int] = [.dawn: sun.sunrise - 30, .day: sun.sunrise + 60,
-                                           .dusk: sun.sunset - 60, .night: sun.sunset + 30]
+        let starts: [DynamicPhase: Int] = [.dawn: sun.sunrise - 30, .day: sun.sunrise + Self.daySideOffset,
+                                           .dusk: sun.sunset - Self.daySideOffset, .night: sun.sunset + 30]
         let ordered = [starts[.dawn]!, starts[.day]!, starts[.dusk]!, starts[.night]!]
         guard ordered.first! >= 0, ordered.last! < 1440, zip(ordered, ordered.dropFirst()).allSatisfy({ $0 < $1 }) else {
             return Self.fixedStarts

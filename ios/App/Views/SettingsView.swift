@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var language = AppLanguage.current()
     @State private var frequency = Preferences().rotationFrequency
     @State private var timing = DynamicTiming.load() == .solar ? DynamicTiming.solar : .fixed
+    @StateObject private var location = LocationFetcher()
 
     var body: some View {
         NavigationStack {
@@ -79,9 +80,18 @@ struct SettingsView: View {
                     }
                     row("sun.horizon", Color(hex: 0xFF9F0A)) {
                         Picker(L("日夜切換"), selection: Binding(get: { timing }, set: {
-                            timing = $0; UserDefaults.standard.set($0.rawValue, forKey: DynamicTiming.defaultsKey) })) {
+                            timing = $0; UserDefaults.standard.set($0.rawValue, forKey: DynamicTiming.defaultsKey)
+                            if $0 == .solar && Coordinate.load().fromTimeZone { location.fetch() } })) {
                             Text(L("固定時間")).tag(DynamicTiming.fixed)
                             Text(L("依日出日落")).tag(DynamicTiming.solar)
+                        }
+                    }
+                    if timing == .solar {
+                        row("location.fill", Color(hex: 0x0A84FF)) {
+                            Text(locationText).foregroundStyle(.secondary).font(.subheadline)
+                            Spacer()
+                            Button(L("使用目前位置")) { location.fetch() }
+                                .disabled(location.status == .locating)
                         }
                     }
                 } footer: {
@@ -90,7 +100,8 @@ struct SettingsView: View {
                         Text(L("換圖頻率決定捷徑「取得目前桌布」多久換一張。"))
                         if timing == .solar {
                             let schedule = DynamicSchedule.load()
-                            Text(L("今天：清晨 \(schedule.startTime(of: .dawn))、白天 \(schedule.startTime(of: .day))、黃昏 \(schedule.startTime(of: .dusk))、夜晚 \(schedule.startTime(of: .night))（依時區推估位置）"))
+                            let _ = location.status
+                            Text(L("今天：清晨 \(schedule.startTime(of: .dawn))、白天 \(schedule.startTime(of: .day))、黃昏 \(schedule.startTime(of: .dusk))、夜晚 \(schedule.startTime(of: .night))"))
                                 .monospacedDigit()
                         }
                     }
@@ -134,6 +145,15 @@ struct SettingsView: View {
             .navigationTitle(L("設定"))
             .navigationDestination(isPresented: $showGuide) { ShortcutsGuideView() }
             .onAppear { model.reload() }
+        }
+    }
+
+    private var locationText: String {
+        switch location.status {
+        case .locating: return L("正在取得位置…")
+        case .denied: return L("沒有位置權限，改用時區推估")
+        case .failed: return L("取不到位置，改用時區推估")
+        default: return Coordinate.load().fromTimeZone ? L("依時區推估位置") : L("使用你的位置")
         }
     }
 

@@ -280,3 +280,32 @@ final class RotationFrequencyTests: XCTestCase {
         XCTAssertTrue(next.time.hasPrefix("16:"), next.time)
     }
 }
+
+final class RotationReviewFixTests: XCTestCase {
+    func testEveryRunFirstCallServesFirstPicture() {
+        let r = WallpaperSelection.choose(at: Date(), dynamicPhaseIDs: nil, pinnedID: nil, available: ["a", "b", "c"], favorites: [],
+                                          favoritesOnly: false, state: RotationState(), frequency: .everyRun)
+        XCTAssertEqual(r.choice?.id, "a")
+        let r2 = WallpaperSelection.choose(at: Date(), dynamicPhaseIDs: nil, pinnedID: nil, available: ["a", "b", "c"], favorites: [],
+                                           favoritesOnly: false, state: r.state, frequency: .everyRun)
+        XCTAssertEqual(r2.choice?.id, "b")
+    }
+
+    func testFallBackHourGetsTwoSlots() {
+        var ny = Calendar(identifier: .gregorian); ny.timeZone = TimeZone(identifier: "America/New_York")!
+        // 2026-11-01 02:00 EDT 撥回 01:00 EST：兩次 01:30 相隔一小時，每小時頻率要算不同格
+        let first = Date(timeIntervalSince1970: 1_793_511_000)   // 05:30Z = 01:30 EDT
+        let second = first.addingTimeInterval(3600)               // 06:30Z = 01:30 EST
+        XCTAssertEqual(ny.component(.hour, from: first), ny.component(.hour, from: second))
+        XCTAssertNotEqual(WallpaperSelection.slot(at: first, frequency: .hourly, calendar: ny),
+                          WallpaperSelection.slot(at: second, frequency: .hourly, calendar: ny))
+        XCTAssertEqual(WallpaperSelection.slot(at: first, frequency: .daily, calendar: ny),
+                       WallpaperSelection.slot(at: second, frequency: .daily, calendar: ny))
+    }
+
+    func testPreviousUsesServedHistory() {
+        XCTAssertEqual(WallpaperSelection.previous(history: ["a", "pinned", "c"], available: ["a", "pinned", "c"])?.id, "pinned")
+        XCTAssertEqual(WallpaperSelection.previous(history: ["a", "gone", "c"], available: ["a", "c"])?.id, "a")
+        XCTAssertNil(WallpaperSelection.previous(history: ["c"], available: ["c"]))
+    }
+}

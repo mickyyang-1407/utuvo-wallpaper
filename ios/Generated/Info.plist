@@ -31,6 +31,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>UTUVO Wallpaper 用你的大約位置計算日出日落，讓日夜桌布準時切換。位置只存在這支 iPhone。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>UTUVO Wallpaper 會把你選擇的桌布存到照片圖庫。</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -44,6 +46,8 @@
 		<key>UIColorName</key>
 		<string></string>
 	</dict>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
