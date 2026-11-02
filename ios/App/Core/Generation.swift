@@ -30,6 +30,13 @@ struct DailyGenerationService: Sendable {
             let png: Data
             if FileManager.default.fileExists(atPath: nativeURL.path) {
                 png = try Data(contentsOf: nativeURL)
+            } else if LocalArt.isLocal(planned.prompt) {
+                // 純色／漸層：本機直接畫成手機尺寸，不送 API。
+                guard let drawn = LocalArt.render(planned.prompt, width: Int(target.width), height: Int(target.height)) else {
+                    throw GenerationError.decoding
+                }
+                png = drawn
+                try ImageProcessing.write(png, to: nativeURL)
             } else {
                 guard batch.canResume(at: now()) else { throw GenerationError.cooldown }
                 // 先記次數再送出：當機也不會重置重試額度。

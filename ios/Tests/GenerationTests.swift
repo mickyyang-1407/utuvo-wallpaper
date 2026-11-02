@@ -11,7 +11,7 @@ final class DailyBatchTests: XCTestCase {
 
     func testFullBatchUsesTenDistinctPortraitTemplates() async throws {
         let provider = ScriptedProvider([])
-        let service = DailyGenerationService(provider: provider, paths: paths, target: target)
+        let service = DailyGenerationService(provider: provider, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id)))
         let results = try await service.run(day: day)
         XCTAssertEqual(results.count, 10)
         XCTAssertEqual(provider.prompts.count, 10)
@@ -39,14 +39,14 @@ final class DailyBatchTests: XCTestCase {
             let batch = try? DailyBatch.load(root: root, day: day)
             if let batch { seen.append(batch.attempts[batch.completed.count]) }
         }
-        _ = try await DailyGenerationService(provider: provider, paths: paths, target: target).run(day: day, count: 2)
+        _ = try await DailyGenerationService(provider: provider, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id))).run(day: day, count: 2)
         XCTAssertEqual(seen, [1, 1])
     }
 
     func test429RetriesWithCooldownThenResumes() async throws {
         let clock = Clock(Date(timeIntervalSince1970: 1_800_000_000))
         let provider = ScriptedProvider([.ok, .fail(.httpStatus(429)), .ok])
-        var service = DailyGenerationService(provider: provider, paths: paths, target: target)
+        var service = DailyGenerationService(provider: provider, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id)))
         service.now = { clock.now }
 
         do { _ = try await service.run(day: day, count: 3); XCTFail("expected 429") }
@@ -73,7 +73,7 @@ final class DailyBatchTests: XCTestCase {
     func testRetryLimitIsThreeWith60And300Cooldowns() async throws {
         let clock = Clock(Date(timeIntervalSince1970: 1_800_000_000))
         let provider = ScriptedProvider([.fail(.httpStatus(503)), .fail(.timeout), .fail(.httpStatus(429)), .ok])
-        var service = DailyGenerationService(provider: provider, paths: paths, target: target)
+        var service = DailyGenerationService(provider: provider, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id)))
         service.now = { clock.now }
         var cooldowns: [TimeInterval?] = []
         for _ in 0..<3 {
@@ -93,7 +93,7 @@ final class DailyBatchTests: XCTestCase {
     func test401IsNotRetried() async throws {
         let clock = Clock(Date(timeIntervalSince1970: 1_800_000_000))
         let provider = ScriptedProvider([.fail(.httpStatus(401))])
-        var service = DailyGenerationService(provider: provider, paths: paths, target: target)
+        var service = DailyGenerationService(provider: provider, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id)))
         service.now = { clock.now }
         do { _ = try await service.run(day: day, count: 2); XCTFail() }
         catch { XCTAssertEqual(error as? GenerationError, .httpStatus(401)) }

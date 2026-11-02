@@ -774,11 +774,18 @@ final class AppModel {
             errorMessage = L("無法取得生成工作鎖，請確認資料夾可以寫入。")
             return false
         }
-        guard var service = try? serviceFactory() else {
+        let recipe = dailyAttempt ? dailyRecipe : manualRecipe
+        var service: GenerationService
+        if let made = try? serviceFactory() {
+            service = made
+        } else if recipe.isLocalOnly {
+            // 只選純色／漸層：本機畫，不需要 API key。
+            service = GenerationService(provider: LocalOnlyProvider())
+        } else {
             errorMessage = GenerationError.missingCredential.localizedDescription
             return false
         }
-        service.recipe = dailyAttempt ? dailyRecipe : manualRecipe
+        service.recipe = recipe
         let batchDay = dailyAttempt ? DailyScheduler.dayKey(Date()) : nil
         if let day = batchDay {
             guard !daily.alreadyAttempted() || DailyBatch.canResume(root: outputRoot, day: day) else { return false }
@@ -883,7 +890,7 @@ final class AppModel {
         guard !daily.alreadyAttempted() || DailyBatch.canResume(root: outputRoot, day: DailyScheduler.dayKey(Date())) else { return }
         // 憑證要先驗證：缺 key 時**不能**記當日 attempt，
         // 否則使用者補好 key 當天就不會再跑了。
-        guard credentialAvailable() else {
+        guard credentialAvailable() || dailyRecipe.isLocalOnly else {
             let message = GenerationError.missingCredential.localizedDescription
             if errorMessage != message { errorMessage = message }
             statusMessage = L("每日自動產生：找不到 API 憑證，未執行（補上憑證後當天仍會執行）。")
@@ -901,4 +908,9 @@ final class AppModel {
             NSWorkspace.shared.open(LabPaths.wallpapersDir)
         } catch { errorMessage = L("無法開啟圖片資料夾，請確認儲存位置可以寫入。") }
     }
+}
+
+/// 只畫純色／漸層時用：不會真的被呼叫（本機規格在送出前就畫好了），萬一被叫到就回報缺 key。
+struct LocalOnlyProvider: ImageProvider {
+    func generateImage(prompt: String) async throws -> Data { throw GenerationError.missingCredential }
 }

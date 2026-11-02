@@ -17,6 +17,13 @@ enum WallpaperTitles {
         case "architecture-arcade": return L("建築光影")
         case "animation-coast": return L("手繪動畫")
         case "gradient-tide": return L("柔和漸層")
+        case "solid-color": return L("純色")
+        case "gradient-soft": return L("漸層")
+        case "dark-oled": return L("深色")
+        case "geometric": return L("幾何")
+        case "city": return L("城市")
+        case "animals": return L("動物")
+        case "render-3d": return L("3D 立體")
         default: return nil
         }
     }

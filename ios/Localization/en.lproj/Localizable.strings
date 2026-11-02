@@ -183,3 +183,9 @@
 "每天最多一批 10 張，每天換主題、配色、光線與構圖；寫了自己的 Prompt 就每張都畫它，用選的分類輪流表現。打開 App 時檢查，系統也可能在夜間補做；不保證準時。沒有收藏時會改用全部桌布。" = "Up to one batch of 10 per day, with new subjects, palettes, light and composition each day; if you write your own prompt, every image paints it, rotating through the categories you picked. Checked when you open the app; the system may also finish overnight, but timing isn't guaranteed. Without favorites, all wallpapers are used.";
 "自己的 Prompt（選填）" = "Your Prompt (Optional)";
 "AI 靈感" = "AI Idea";
+"3D 立體" = "3D Render";
+"動物" = "Animals";
+"城市" = "City";
+"幾何" = "Geometric";
+"漸層" = "Gradient";
+"純色" = "Solid";

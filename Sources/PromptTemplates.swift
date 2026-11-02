@@ -20,11 +20,14 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
     let palettes: [String]
     /// 寫實或具象畫面才加光線描述；抽象、宇宙不加。
     var representational = true
+    /// 本機直接畫（"solid" 純色、"gradient" 漸層），不送 AI；palettes 放色碼規格。
+    var local: String? = nil
 
     /// 預設組合（第一個主題、第一組配色）。
     var prompt: String { compose(subject: subjects[0], palette: palettes[0], light: nil, composition: nil) }
 
     func compose(subject: String, palette: String, light: String?, composition: String?) -> String {
+        if let local { return LocalArt.prefix + local + ":" + palette }
         var parts = [style, "Subject: \(subject)", "Palette: \(palette)"]
         if let light, representational { parts.append(light) }
         if let composition { parts.append(composition) }
@@ -146,6 +149,56 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
             palettes: ["deep ocean blue through teal to pale sand", "rose to lilac to midnight", "lime to aqua to navy",
                        "peach to coral to plum", "warm grey to soft gold"],
             representational: false),
+        // 競品常見、我們原本沒有的分類（2026-11-02）。純色、漸層在本機畫，不花額度。
+        PromptTemplate(
+            id: "solid-color", title: "純色 · 純色", category: "純色", style: "", subjects: ["solid"],
+            palettes: ["#1C2B4A", "#2F4F3E", "#B5543A", "#D8C3A5", "#8FA99A", "#9C7A97", "#2B2B2E", "#EFE9DD",
+                       "#1F6F8B", "#D9A441", "#5B6C8F", "#C46A7A", "#3E5641", "#E7D2C3", "#0E1116", "#7A8B99",
+                       "#A63A50", "#4A6FA5", "#C9B79C", "#264653", "#E76F51", "#6D597A", "#F4A261", "#84A59D"],
+            representational: false, local: "solid"),
+        PromptTemplate(
+            id: "gradient-soft", title: "漸層 · 漸層", category: "漸層", style: "", subjects: ["gradient"],
+            palettes: ["#0F2027,#203A43,#2C5364|120", "#FF9A8B,#FF6A88,#FF99AC|135", "#355C7D,#6C5B7B,#C06C84|160",
+                       "#134E5E,#71B280|110", "#F7971E,#FFD200|90", "#1D2B64,#F8CDDA|150", "#4568DC,#B06AB3|135",
+                       "#0B486B,#F56217|125", "#43C6AC,#191654|140", "#FBD3E9,#BB377D|100", "#232526,#414345|90",
+                       "#FFE29F,#FFA99F,#FF719A|130", "#2E3192,#1BFFFF|145", "#C9D6FF,#E2E2E2|90", "#3A1C71,#D76D77,#FFAF7B|135",
+                       "#16222A,#3A6073|115"],
+            representational: false, local: "gradient"),
+        PromptTemplate(
+            id: "dark-oled", title: "深色 · 深色", category: "深色",
+            style: "Dark wallpaper for OLED screens, mostly pure black background, a single softly lit subject, high contrast, quiet and minimal",
+            subjects: ["a thin crescent moon", "a single glowing neon line curving through darkness", "a faint spiral galaxy",
+                       "the edge of a black sand dune catching light", "a lone paper lantern", "a rim-lit flower",
+                       "the crest of a dark ocean wave", "a mountain ridge silhouette under faint stars"],
+            palettes: ["pure black with cool blue light", "black with warm amber glow", "black with violet rim light", "black with silver highlights"]),
+        PromptTemplate(
+            id: "geometric", title: "幾何 · 幾何", category: "幾何",
+            style: "Clean geometric pattern design, precise vector shapes, balanced repetition, subtle depth and soft shadows",
+            subjects: ["interlocking hexagons", "concentric circles", "isometric cubes", "a Bauhaus composition of circles and squares",
+                       "a grid of flowing lines", "a triangular mosaic", "an art deco fan pattern", "overlapping arcs"],
+            palettes: ["navy, mustard and cream", "terracotta, sage and sand", "black, white and one red accent", "pastel mint, peach and lilac",
+                       "deep teal and gold"],
+            representational: false),
+        PromptTemplate(
+            id: "city", title: "城市 · 城市", category: "城市",
+            style: "City photography, cinematic realism, natural detail, no people in focus, no readable signs",
+            subjects: ["a Taipei street at night after rain", "a narrow Tokyo alley with lanterns", "New York rooftops with water towers",
+                       "the Hong Kong harbour skyline", "a Paris boulevard in autumn", "a Lisbon tram on a steep hill",
+                       "a Seoul street with soft neon", "a quiet Singapore riverside"],
+            palettes: ["teal and orange city lights", "soft pastel morning tones", "deep blue hour with warm windows", "muted film colors"]),
+        PromptTemplate(
+            id: "animals", title: "動物 · 動物", category: "動物",
+            style: "Wildlife photograph, natural habitat, sharp detail on the eyes, shallow depth of field, calm mood",
+            subjects: ["a red fox in fresh snow", "a cat sleeping by a sunny window", "a humpback whale breaching", "a hummingbird near a flower",
+                       "a deer in a misty forest", "an owl at dusk", "a sea turtle in clear water", "koi fish in a quiet pond"],
+            palettes: ["natural earthy colors", "soft winter whites and blues", "warm golden tones", "lush greens"]),
+        PromptTemplate(
+            id: "render-3d", title: "3D · 3D 立體", category: "3D",
+            style: "Soft 3D render, smooth clay-like materials, gentle studio lighting and soft shadows, playful minimal scene",
+            subjects: ["floating pastel spheres", "a tiny island diorama", "stacked geometric blocks", "glass marbles on a soft surface",
+                       "abstract arches and steps", "puffy cloud shapes", "low-poly mountains", "a toy-like city block"],
+            palettes: ["pastel pink and baby blue", "cream, sage and coral", "lilac and soft yellow", "monochrome warm white"],
+            representational: false),
     ]
 
     /// 依序輪替使用模板（舊行為；舊的每日進度檔續作時用）。
@@ -200,6 +253,8 @@ struct DailyRecipe: Equatable, Sendable {
         let picked = PromptTemplate.shared.filter { styles.contains($0.id) }
         return picked.isEmpty ? PromptTemplate.shared : picked
     }
+    /// 選的分類全是本機畫的（純色／漸層）：不需要 API key。
+    var isLocalOnly: Bool { templates.allSatisfy { $0.local != nil } }
     var trimmedIdea: String {
         String(idea.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.ideaLimit))
     }
@@ -230,6 +285,21 @@ enum PromptInspiration {
         "建築": [("清水模美術館的長廊", "a long concrete museum corridor"), ("螺旋樓梯由上往下看", "a spiral staircase seen from above"),
                 ("玻璃溫室裡的熱帶植物", "tropical plants inside a glass greenhouse"), ("地中海白牆藍門", "Mediterranean white walls and blue doors"),
                 ("夜裡發光的摩天大樓", "a skyscraper glowing at night"), ("老廠房改成的藝廊", "an old factory turned into a gallery")],
+        "深色": [("黑夜裡的一彎新月", "a thin crescent moon in the dark"), ("黑暗中一條霓虹光線", "one neon line in darkness"),
+                ("只有窗邊一盞燈的夜", "a night lit only by one window lamp"), ("深夜海面上的月光", "moonlight on a midnight sea"),
+                ("黑色背景上的一朵白花", "a single white flower on black"), ("星空下的山脊剪影", "a ridge silhouette under stars")],
+        "幾何": [("包浩斯風格的圓與方", "Bauhaus circles and squares"), ("層層疊疊的六角形", "stacked hexagons"),
+                ("等角視角的立方體", "isometric cubes"), ("裝飾藝術風的扇形", "art deco fans"),
+                ("流動的彩色線條網格", "a grid of flowing colored lines"), ("三角形馬賽克", "a triangle mosaic")],
+        "城市": [("雨後的台北巷口夜景", "a Taipei alley at night after rain"), ("東京下町的小巷", "a small Tokyo backstreet"),
+                ("香港維多利亞港的夜景", "Victoria Harbour at night"), ("紐約屋頂上的水塔", "water towers on New York rooftops"),
+                ("里斯本爬坡的電車", "a Lisbon tram climbing a hill"), ("巴黎秋天的林蔭大道", "a Paris boulevard in autumn")],
+        "動物": [("雪地裡的紅狐狸", "a red fox in the snow"), ("窗邊打盹的貓", "a cat napping by the window"),
+                ("躍出海面的鯨魚", "a whale leaping out of the sea"), ("霧中森林裡的鹿", "a deer in a misty forest"),
+                ("黃昏的貓頭鷹", "an owl at dusk"), ("清澈海水裡的海龜", "a sea turtle in clear water")],
+        "3D": [("漂浮的粉彩圓球", "floating pastel spheres"), ("小島模型", "a tiny island diorama"),
+               ("堆疊的積木", "stacked toy blocks"), ("柔軟的雲朵造型", "soft puffy clouds"),
+               ("玻璃彈珠", "glass marbles"), ("低多邊形的山", "low-poly mountains")],
         "動畫": [("夏天的鄉間公車站", "a countryside bus stop in summer"), ("海邊的小火車站", "a little train station by the sea"),
                 ("放學後的教室與夕陽", "an empty classroom at sunset after school"), ("祭典夜晚的煙火", "festival fireworks at night"),
                 ("雲端上的浮空島", "floating islands above the clouds"), ("雨後屋頂上的彩虹", "a rainbow over rooftops after rain")],
@@ -238,7 +308,9 @@ enum PromptInspiration {
     /// 依選的分類挑一個（沒選＝全部），盡量不跟目前欄位內容一樣。
     static func pick(categories: [String], current: String, chinese: Bool,
                      random: () -> Int = { Int.random(in: 0..<10_000) }) -> String {
-        let keys = categories.isEmpty ? DailyRecipe.categories : categories
+        // 純色、漸層沒有主題可想：只選它們時改從全部分類挑。
+        let withIdeas = categories.filter { ideas[$0] != nil }
+        let keys = withIdeas.isEmpty ? DailyRecipe.categories : withIdeas
         let pool = keys.flatMap { ideas[$0] ?? [] }.map { chinese ? $0.zh : $0.en }
         guard !pool.isEmpty else { return current }
         let fresh = pool.filter { $0 != current }
@@ -274,7 +346,8 @@ enum DailyPlan {
             used[template.id] = round + 1
             let base = Int(DynamicAutoPlanner.stableHash(template.id) % 1000)
             func pick<T>(_ list: [T], stride: Int) -> T { list[(base + dayNumber * stride + round) % list.count] }
-            let subject = idea.isEmpty ? pick(template.subjects, stride: 1) : idea
+            // 純色、漸層是本機畫的，不吃自己的 Prompt。
+            let subject = idea.isEmpty || template.local != nil ? pick(template.subjects, stride: 1) : idea
             // 自己的想法：主題固定，靠配色、光線、構圖做出差異（同一天多張也各不同）。
             let palette = pick(template.palettes, stride: 1)
             let light = pick(PromptTemplate.lights, stride: 5)

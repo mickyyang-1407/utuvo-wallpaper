@@ -3,8 +3,9 @@ import XCTest
 
 final class PortraitPromptTests: XCTestCase {
     func testAllTemplatesBecomePortrait() {
-        XCTAssertEqual(PromptTemplate.shared.count, 10)
-        for template in PromptTemplate.shared {
+        XCTAssertEqual(PromptTemplate.shared.count, 17)
+        // 純色、漸層是本機畫的，不送提示詞；其他 15 種都要轉成直式。
+        for template in PromptTemplate.shared where template.local == nil {
             let out = PortraitPrompt.convert(template.prompt)
             XCTAssertFalse(out.contains("16:9"), template.id)
             XCTAssertTrue(out.contains("9:16"), template.id)
@@ -201,7 +202,7 @@ final class CategoryTests: XCTestCase {
 
     func testFilterOrderMatchesSpec() {
         XCTAssertEqual(GalleryFilter.allFilters.map(\.id),
-                       ["all", "favorites", "c-自然", "c-極簡", "c-抽象", "c-插畫", "c-宇宙", "c-水彩", "c-建築", "c-動畫", "c-其他"])
+                       ["all", "favorites", "c-自然", "c-極簡", "c-抽象", "c-插畫", "c-宇宙", "c-水彩", "c-建築", "c-動畫", "c-純色", "c-漸層", "c-深色", "c-幾何", "c-城市", "c-動物", "c-3D", "c-其他"])
     }
 }
 

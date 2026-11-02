@@ -24,7 +24,7 @@ extension SelfTest {
         let dayB = DailyPlan.make(day: "2026-11-03", count: 10, recipe: all)
         let sameDayStable = dayA == dayA2
         let changed = zip(dayA, dayB).filter { $0.prompt != $1.prompt }.count
-        let allStyles = Set(dayA.map(\.templateID)).count == PromptTemplate.shared.count
+        let allStyles = Set(dayA.map(\.templateID)).count == 10
         record("每日 10 張：同一天固定、隔天主題／配色會換", sameDayStable && changed >= 8 && allStyles,
                "隔天不同 \(changed)／10 張、風格 \(Set(dayA.map(\.templateID)).count) 種")
 
@@ -41,7 +41,7 @@ extension SelfTest {
         for template in PromptTemplate.shared {
             let subjects = (0..<template.subjects.count).map { offset -> String in
                 let day = fmt.string(from: cal0.date(byAdding: .day, value: offset, to: start0)!)
-                let prompt = DailyPlan.make(day: day, count: 10, recipe: all).first { $0.templateID == template.id }!.prompt
+                let prompt = DailyPlan.make(day: day, count: 1, recipe: DailyRecipe(styles: [template.id])).first!.prompt
                 return template.subjects.first { prompt.contains("Subject: \($0).") } ?? "?"
             }
             if Set(subjects).count != template.subjects.count { cycleOK = false }
@@ -59,8 +59,9 @@ extension SelfTest {
 
         let idea = DailyRecipe(styles: [], idea: "  台北的老公寓陽台  ")
         let ideaPlan = DailyPlan.make(day: "2026-11-02", count: 10, recipe: idea)
-        let ideaUsed = ideaPlan.allSatisfy { $0.prompt.contains("Subject: 台北的老公寓陽台.") }
-        let ideaStyles = Set(ideaPlan.map(\.templateID)).count == PromptTemplate.shared.count
+        // 純色、漸層是本機畫的，不吃自己的 Prompt；其他每張都要畫它。
+        let ideaUsed = ideaPlan.filter { !LocalArt.isLocal($0.prompt) }.allSatisfy { $0.prompt.contains("Subject: 台北的老公寓陽台.") }
+        let ideaStyles = Set(ideaPlan.map(\.templateID)).count == 10
         record("自己的想法：每張都畫它、用不同風格表現", ideaUsed && ideaStyles, ideaPlan[0].prompt)
 
         let suite = "selftest.recipe.\(UUID().uuidString)"
@@ -76,7 +77,7 @@ extension SelfTest {
         let png = (try? makeGradientPNG(width: 64, height: 36)) ?? Data()
         do {
             let recorder = PromptRecorder(data: png)
-            let service = GenerationService(provider: recorder, recipe: idea)
+            let service = GenerationService(provider: recorder, recipe: DailyRecipe(styles: aiOnlyRecipe.styles, idea: idea.idea))
             _ = try await service.generate(count: 3, outputRoot: batchRoot, batchDay: "2026-11-02") { _, _ in }
             let prompts = await recorder.prompts
             let stored = try DailyBatch.load(root: batchRoot, day: "2026-11-02").plan ?? []
@@ -138,11 +139,32 @@ extension SelfTest {
             return PromptInspiration.pick(categories: ["宇宙"], current: cosmic[0], chinese: true, random: { counter })
         }
         let englishIdea = PromptInspiration.pick(categories: ["水彩"], current: "", chinese: false)
-        let allCovered = DailyRecipe.categories.allSatisfy { (PromptInspiration.ideas[$0]?.count ?? 0) >= 5 }
+        // 純色、漸層沒有主題，其他每個分類都要有點子。
+        let allCovered = DailyRecipe.categories.filter { !$0.hasPrefix("純色") && !$0.hasPrefix("漸層") }
+            .allSatisfy { (PromptInspiration.ideas[$0]?.count ?? 0) >= 5 }
         record("AI 靈感：只挑選到的分類、不重複目前內容、英文介面給英文、每個分類都有點子",
                picks.allSatisfy { cosmic.contains($0) && $0 != cosmic[0] } && Set(picks).count > 1
                    && PromptInspiration.ideas["水彩"]!.map(\.en).contains(englishIdea) && allCovered,
                picks.prefix(3).joined(separator: "／"))
+
+        // 純色／漸層：本機畫出正確尺寸的 PNG，生成時不送 API。
+        let solidPNG = LocalArt.render("local:solid:#264653", width: 384, height: 216)
+        let gradientPNG = LocalArt.render("local:gradient:#0F2027,#203A43,#2C5364|120", width: 384, height: 216)
+        let solidSize = solidPNG.flatMap { ImageResampler.pixelSize(of: $0) }
+        let badSpec = LocalArt.render("local:solid:#XYZ", width: 10, height: 10) == nil && LocalArt.render("a mountain", width: 10, height: 10) == nil
+        var localNoAPI = false
+        do {
+            let localRoot = tempRoot.appendingPathComponent("local-art", isDirectory: true)
+            let recorder = PromptRecorder(data: png)
+            let service = GenerationService(provider: recorder, recipe: DailyRecipe(styles: ["solid-color", "gradient-soft"]))
+            let made = try await service.generate(count: 4, outputRoot: localRoot, batchDay: "2026-11-03") { _, _ in }
+            let sent = await recorder.prompts.count
+            let files = (try? FileManager.default.contentsOfDirectory(atPath: localRoot.appendingPathComponent("wallpapers").path))?.filter { $0.hasSuffix("6k.jpg") } ?? []
+            localNoAPI = made.count == 4 && sent == 0 && files.count == 4
+        } catch { localNoAPI = false }
+        record("純色／漸層：本機畫圖、尺寸正確、規格錯就不畫、生成時完全不送 API",
+               solidSize?.width == 384 && solidSize?.height == 216 && gradientPNG != nil && badSpec && localNoAPI,
+               "localNoAPI=\(localNoAPI)")
 
         let legacy = DailyPlan.legacy(day: "2026-11-02", count: 10)
         record("舊進度檔沒有計畫：檔名照舊輪替", legacy.map(\.slug) == PromptTemplate.rotated(count: 10).map(\.id), "")

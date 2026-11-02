@@ -177,6 +177,10 @@ struct GenerationService: Sendable {
             let png: Data
             if batchDay != nil, FileManager.default.fileExists(atPath: nativeURL.path) {
                 png = try Data(contentsOf: nativeURL)
+            } else if LocalArt.isLocal(planned.prompt) {
+                // 純色／漸層：本機畫原生 3840 × 2160，不送 API、不記重試次數。
+                guard let drawn = LocalArt.render(planned.prompt, width: 3840, height: 2160) else { throw GenerationError.decoding }
+                png = drawn
             } else {
                 if let day = batchDay {
                     guard batch!.canResume() else { throw GenerationError.transport }

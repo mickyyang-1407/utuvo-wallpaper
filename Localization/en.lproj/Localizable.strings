@@ -395,3 +395,14 @@
 "自己的 Prompt（選填）" = "Your Prompt (Optional)";
 "AI 靈感" = "AI Idea";
 "幫你想一個主題，填進 Prompt 欄" = "Suggests a subject and fills in the prompt field";
+"3D 立體" = "3D Render";
+"上一張（←）" = "Previous (←)";
+"下一張（→）" = "Next (→)";
+"動物" = "Animals";
+"城市" = "City";
+"幾何" = "Geometric";
+"放大預覽（也可以在縮圖上按兩下）" = "Open a large preview (or double-click a thumbnail)";
+"漸層" = "Gradient";
+"純色" = "Solid";
+"關閉（Esc）" = "Close (Esc)";
+"預覽" = "Preview";

@@ -11,6 +11,9 @@ import UniformTypeIdentifiers
 /// - 只用暫存 fixture，測完刪掉。
 @MainActor
 enum SelfTest {
+    /// 只用會送 API 的風格（不含本機畫的純色／漸層）。
+    static let aiOnlyRecipe = DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id))
+
     /// 只回傳固定 PNG 的假 provider（不連網）。
     struct FixtureProvider: ImageProvider {
         let data: Data
@@ -116,6 +119,9 @@ enum SelfTest {
             .appendingPathComponent("wallpaper-selftest-\(UUID().uuidString)", isDirectory: true)
         let testSuite = "wallpaper-selftest-preferences-\(UUID().uuidString)"
         let testDefaults = UserDefaults(suiteName: testSuite)!
+        // 這些測試量的是 API 請求、重試、取消：一律用會送 API 的風格（純色／漸層另有專門測試）。
+        aiOnlyRecipe.save(testDefaults)
+        aiOnlyRecipe.save(testDefaults, prefix: DailyRecipe.manualPrefix)
         defer { testDefaults.removePersistentDomain(forName: testSuite) }
         let previousDataRoot = getenv(LabPaths.dataDirectoryVariable).map { String(cString: $0) }
         setenv(LabPaths.dataDirectoryVariable, tempRoot.path, 1)
@@ -273,7 +279,7 @@ enum SelfTest {
                    "makeWallpaper 回傳 nil")
 
             // 6) 生成流程（用 fixture，不連網）＋不覆蓋
-            let service = GenerationService(provider: FixtureProvider(data: sourcePNG))
+            let service = GenerationService(provider: FixtureProvider(data: sourcePNG), recipe: aiOnlyRecipe)
             var generatedOK = false
             var noOverwriteOK = false
             var nativeSidecarOK = true
@@ -347,7 +353,7 @@ enum SelfTest {
             record("metadata：6K 成品自己的 sidecar 標 resampled（非原生／非 AI 放大）", fiveKSidecarOK, sidecarDetail)
 
             // 7) HTTP 錯誤不得假裝成功
-            let failing = GenerationService(provider: FailingProvider(message: "boom"))
+            let failing = GenerationService(provider: FailingProvider(message: "boom"), recipe: aiOnlyRecipe)
             var failureSurfaced = false
             do {
                 _ = try await failing.generate(count: 1, outputRoot: tempRoot, progress: { _, _ in })
@@ -397,7 +403,7 @@ enum SelfTest {
             // 9) 輪換接線：模式 → rotation.mode → 計時器 → 設為桌面
             let rotDesktop = FakeDesktop()
             let rotModel = AppModel(desktop: rotDesktop,
-                                     serviceFactory: { GenerationService(provider: FakeProvider(behavior: .immediate(sourcePNG))) },
+                                     serviceFactory: { GenerationService(provider: FakeProvider(behavior: .immediate(sourcePNG)), recipe: aiOnlyRecipe) },
                                      credentialAvailable: { false }, preferences: testDefaults)
             rotModel.setRotationMode(.fiveMinutes)
             let modeWired = (rotModel.rotationMode == .fiveMinutes) && rotModel.isRotationRunning
@@ -421,7 +427,7 @@ enum SelfTest {
             let resumeRoot = tempRoot.appendingPathComponent("resume")
             let interrupted = InterruptedProvider(data: sourcePNG)
             do {
-                _ = try await GenerationService(provider: interrupted).generate(
+                _ = try await GenerationService(provider: interrupted, recipe: aiOnlyRecipe).generate(
                     count: 3, outputRoot: resumeRoot, batchDay: "fixture", progress: { _, _ in })
             } catch {}
             var checkpoint = try? DailyBatch.load(root: resumeRoot, day: "fixture")
@@ -430,7 +436,7 @@ enum SelfTest {
             let backoff = checkpoint?.canResume() == false
             checkpoint?.retryAfter = Date.distantPast
             try? checkpoint?.save(root: resumeRoot, day: "fixture")
-            let resumed = try? await GenerationService(provider: interrupted).generate(
+            let resumed = try? await GenerationService(provider: interrupted, recipe: aiOnlyRecipe).generate(
                 count: 3, outputRoot: resumeRoot, batchDay: "fixture", progress: { _, _ in })
             let prompts = await interrupted.prompts
             record("每日續作：保留成品、冷卻後只補未完成主題、重開服務仍有效",
@@ -623,7 +629,7 @@ enum SelfTest {
             // 10) 取消：舊 Task 還在收尾時必須維持 busy，第二批不能開
             let cancelProvider = FakeProvider(behavior: .blockUntilCancelled)
             let cancelModel = AppModel(desktop: FakeDesktop(),
-                                        serviceFactory: { GenerationService(provider: cancelProvider) },
+                                        serviceFactory: { GenerationService(provider: cancelProvider, recipe: aiOnlyRecipe) },
                                         credentialAvailable: { false }, preferences: testDefaults)
             cancelModel.startGeneration(count: 1)
             // 等第一批真的走到 provider（否則取消會在請求送出前就擋掉，測不到「進行中取消」）
@@ -646,7 +652,7 @@ enum SelfTest {
             // 11) provider 直接回取消錯誤：要分類成「已取消」，不是「生成失敗」
             let cancelledProvider = FakeProvider(behavior: .throwsCancelled)
             let cancelledModel = AppModel(desktop: FakeDesktop(),
-                                          serviceFactory: { GenerationService(provider: cancelledProvider) },
+                                          serviceFactory: { GenerationService(provider: cancelledProvider, recipe: aiOnlyRecipe) },
                                           credentialAvailable: { false }, preferences: testDefaults)
             cancelledModel.startGeneration(count: 1)
             let cancelledUnwound = await SelfTest.waitUntil { !cancelledModel.isGenerating }
@@ -667,13 +673,13 @@ enum SelfTest {
                 let dailyModel = AppModel(desktop: FakeDesktop(),
                                           daily: daily,
                                           outputRoot: tempRoot.appendingPathComponent("daily", isDirectory: true),
-                                          serviceFactory: { GenerationService(provider: dailyProvider) },
+                                          serviceFactory: { GenerationService(provider: dailyProvider, recipe: aiOnlyRecipe) },
                                           credentialAvailable: { credentialReady }, preferences: testDefaults)
                 dailyModel.setDailyMode(.ten)
                 let reopenedModel = AppModel(desktop: FakeDesktop(),
                                              daily: DailyScheduler(defaults: suiteDefaults),
                                              outputRoot: tempRoot.appendingPathComponent("daily-reopened", isDirectory: true),
-                                             serviceFactory: { GenerationService(provider: dailyProvider) },
+                                             serviceFactory: { GenerationService(provider: dailyProvider, recipe: aiOnlyRecipe) },
                                              credentialAvailable: { false }, preferences: testDefaults)
                 let remembered = reopenedModel.dailyMode == .ten
                 let templates = PromptTemplate.rotated(count: 10)
@@ -707,7 +713,7 @@ enum SelfTest {
             // 13) 套用結果：0 顆螢幕或讀回不符都不能顯示成功
             let applyDesktop = FakeDesktop()
             let applyModel = AppModel(desktop: applyDesktop,
-                                      serviceFactory: { GenerationService(provider: FakeProvider(behavior: .immediate(sourcePNG))) },
+                                      serviceFactory: { GenerationService(provider: FakeProvider(behavior: .immediate(sourcePNG)), recipe: aiOnlyRecipe) },
                                       credentialAvailable: { false }, preferences: testDefaults)
             let testWallpaper = Wallpaper(id: "fixture",
                                           url: tempRoot.appendingPathComponent("fixture.png"),

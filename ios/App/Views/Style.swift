@@ -84,6 +84,13 @@ enum TileStyle {
         case "水彩": return ("paintpalette.fill", Color(hex: 0x40C8E0))
         case "建築": return ("building.columns.fill", Color(hex: 0xC9A26B))
         case "動畫": return ("film.fill", Color(hex: 0xFF6482))
+        case "純色": return ("circle.fill", Color(hex: 0x64D2FF))
+        case "漸層": return ("circle.lefthalf.filled", Color(hex: 0xBF5AF2))
+        case "深色": return ("moon.fill", Color(hex: 0x48484A))
+        case "幾何": return ("hexagon.fill", Color(hex: 0x0A84FF))
+        case "城市": return ("building.2.fill", Color(hex: 0xFF453A))
+        case "動物": return ("pawprint.fill", Color(hex: 0xA2845E))
+        case "3D": return ("cube.fill", Color(hex: 0x5AC8FA))
         default: return ("photo", Color(hex: 0x636366))
         }
     }

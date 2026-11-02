@@ -29,6 +29,13 @@ enum WallpaperCategory {
         case "水彩": return L("水彩")
         case "建築": return L("建築")
         case "動畫": return L("動畫")
+        case "純色": return L("純色")
+        case "漸層": return L("漸層")
+        case "深色": return L("深色")
+        case "幾何": return L("幾何")
+        case "城市": return L("城市")
+        case "動物": return L("動物")
+        case "3D": return L("3D")
         default: return L("其他")
         }
     }

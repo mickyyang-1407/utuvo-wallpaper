@@ -11,9 +11,9 @@ final class VarietyTests: XCTestCase {
 
     func testDifferentDaysGetDifferentPrompts() async throws {
         let first = ScriptedProvider([])
-        _ = try await DailyGenerationService(provider: first, paths: paths, target: target).run(day: "2026-11-02")
+        _ = try await DailyGenerationService(provider: first, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id))).run(day: "2026-11-02")
         let second = ScriptedProvider([])
-        _ = try await DailyGenerationService(provider: second, paths: paths, target: target).run(day: "2026-11-03")
+        _ = try await DailyGenerationService(provider: second, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id))).run(day: "2026-11-03")
         XCTAssertEqual(Set(first.prompts).count, 10)
         XCTAssertTrue(Set(first.prompts).isDisjoint(with: second.prompts), "隔天 10 張提示詞都不同")
     }
@@ -27,7 +27,7 @@ final class VarietyTests: XCTestCase {
         for template in PromptTemplate.shared {
             let picked = (0..<template.subjects.count).map { offset -> String in
                 let day = formatter.string(from: calendar.date(byAdding: .day, value: offset, to: start)!)
-                let prompt = DailyPlan.make(day: day, count: 10, recipe: DailyRecipe()).first { $0.templateID == template.id }!.prompt
+                let prompt = DailyPlan.make(day: day, count: 1, recipe: DailyRecipe(styles: [template.id])).first!.prompt
                 return template.subjects.first { prompt.contains("Subject: \($0).") } ?? "?"
             }
             XCTAssertEqual(Set(picked).count, template.subjects.count, template.id)
@@ -49,7 +49,7 @@ final class VarietyTests: XCTestCase {
 
     func testResumeKeepsTheStoredPlanAfterSettingsChange() async throws {
         let failing = ScriptedProvider([.ok, .fail(.httpStatus(500))])
-        let recipe = DailyRecipe(styles: [], idea: "雨後的竹林")
+        let recipe = DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id), idea: "雨後的竹林")
         do { _ = try await DailyGenerationService(provider: failing, paths: paths, target: target, recipe: recipe)
             .run(day: "2026-11-02", count: 3); XCTFail() } catch {}
         let stored = try DailyBatch.load(root: paths.root, day: "2026-11-02").plan
@@ -81,6 +81,18 @@ final class VarietyTests: XCTestCase {
             XCTAssertNotEqual(idea, current)
             XCTAssertTrue(PromptInspiration.ideas["建築"]!.map(\.zh).contains(idea))
         }
+    }
+
+    func testLocalStylesDrawWithoutCallingTheAPI() async throws {
+        let provider = ScriptedProvider([])
+        let results = try await DailyGenerationService(provider: provider, paths: paths, target: target,
+                                                       recipe: DailyRecipe(styles: ["solid-color", "gradient-soft"]))
+            .run(day: "2026-11-03", count: 3)
+        XCTAssertEqual(results.count, 3)
+        XCTAssertTrue(provider.prompts.isEmpty, "純色／漸層不送 API")
+        let files = try FileManager.default.contentsOfDirectory(atPath: paths.wallpapers.path)
+        XCTAssertEqual(files.count, 3)
+        for name in files { XCTAssertEqual(ImageProcessing.pixelSize(at: paths.wallpapers.appendingPathComponent(name)), target) }
     }
 
     func testRecipePersistsInDefaults() {

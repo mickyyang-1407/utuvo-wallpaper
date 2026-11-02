@@ -63,6 +63,13 @@ func categoryTitle(_ name: String) -> String {
     case "水彩": return L("水彩")
     case "建築": return L("建築")
     case "動畫": return L("動畫")
+    case "純色": return L("純色")
+    case "漸層": return L("漸層")
+    case "深色": return L("深色")
+    case "幾何": return L("幾何")
+    case "城市": return L("城市")
+    case "動物": return L("動物")
+    case "3D": return L("3D")
     case "其他": return L("其他")
     default: return name
     }
@@ -76,6 +83,8 @@ struct ContentView: View {
     @State private var search = ""
     @State private var newestFirst = false
     @State private var showInspector = true
+    /// 大圖預覽中的桌布 id（nil＝沒開）。
+    @State private var previewID: String?
     @State private var showGeneration = false
     @State private var showSchedule = false
     @State private var showSettings = false
@@ -161,6 +170,7 @@ struct ContentView: View {
                 }
                 statusBar
             }
+            .overlay { if let id = previewID, let wallpaper = visibleWallpapers.first(where: { $0.id == id }) { previewOverlay(wallpaper) } }
             .background(CanvasBackground(backdrop: backdropImage))
             .navigationTitle(section?.title ?? L("所有桌布"))
             .searchable(text: $search, placement: .toolbar, prompt: "搜尋桌布")
@@ -491,8 +501,10 @@ struct ContentView: View {
             .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain).accessibilityLabel("選取 \(displayTitle(wallpaper))")
+        .simultaneousGesture(TapGesture(count: 2).onEnded { openPreview(wallpaper) })
         .contextMenu {
             let targets = contextTargets(for: wallpaper)
+            Button("預覽") { openPreview(wallpaper) }
             Button("設為桌布") { Task { await model.apply(wallpaper) } }
                 .disabled(model.isApplying || targets.count > 1)
             Button(model.favoriteIDs.contains(wallpaper.id) ? "取消收藏" : "加入收藏") {
@@ -1161,7 +1173,19 @@ struct ContentView: View {
                         .buttonStyle(SecondaryCapsuleStyle())
                         .disabled(previewedScene?.hasExport != true)
                 } else if let wallpaper = inspected {
-                    thumbnail(wallpaper.url, radius: 12)
+                    Button { openPreview(wallpaper) } label: {
+                        thumbnail(wallpaper.url, radius: 12)
+                            .overlay(alignment: .bottomTrailing) {
+                                Label("預覽", systemImage: "arrow.up.left.and.arrow.down.right")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .modifier(HeroLabelBackground())
+                                    .foregroundStyle(.white)
+                                    .padding(8)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .help("放大預覽（也可以在縮圖上按兩下）")
                     HStack(spacing: 8) {
                         IconTile(symbol: WallpaperPalette.categorySymbol(wallpaper.category),
                                  color: WallpaperPalette.categoryColor(wallpaper.category), size: 24)
@@ -1290,6 +1314,67 @@ struct ContentView: View {
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
         .aspectRatio(16.0 / 9, contentMode: .fit)
+    }
+
+    // MARK: - 大圖預覽
+
+    private func openPreview(_ wallpaper: Wallpaper) {
+        model.select(wallpaper)
+        withAnimation(.easeOut(duration: 0.18)) { previewID = wallpaper.id }
+    }
+
+    private func stepPreview(_ delta: Int) {
+        guard let id = previewID, let index = visibleWallpapers.firstIndex(where: { $0.id == id }), !visibleWallpapers.isEmpty else { return }
+        let next = visibleWallpapers[(index + delta + visibleWallpapers.count) % visibleWallpapers.count]
+        model.select(next)
+        previewID = next.id
+    }
+
+    /// 蓋住整個主畫面的大圖：←／→ 換張、Esc 關閉，可以直接設為桌布。
+    private func previewOverlay(_ wallpaper: Wallpaper) -> some View {
+        ZStack {
+            Color.black.opacity(0.88).ignoresSafeArea()
+                .onTapGesture { previewID = nil }
+            if let image = ThumbnailCache.image(for: wallpaper.url, maxPixel: 3000) {
+                Image(nsImage: image)
+                    .resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
+                    .padding(.horizontal, 64).padding(.top, 56).padding(.bottom, 80)
+                    .id(wallpaper.id)
+                    .transition(.opacity)
+            }
+            VStack {
+                HStack(spacing: 10) {
+                    Text(displayTitle(wallpaper)).font(.headline).foregroundStyle(.white).lineLimit(1)
+                    Text(wallpaper.pixelText).font(.caption).monospacedDigit().foregroundStyle(.white.opacity(0.7))
+                    Spacer()
+                    Button { previewID = nil } label: { Image(systemName: "xmark").frame(width: 24, height: 24) }
+                        .glassControl()
+                        .keyboardShortcut(.cancelAction)
+                        .help("關閉（Esc）")
+                }
+                .padding(.horizontal, 20).padding(.top, 14)
+                Spacer()
+                HStack(spacing: 12) {
+                    Button { stepPreview(-1) } label: { Image(systemName: "chevron.left").frame(width: 22, height: 22) }
+                        .glassControl()
+                        .keyboardShortcut(.leftArrow, modifiers: [])
+                        .help("上一張（←）")
+                    Button(model.isApplying ? "套用中…" : "設為桌布", systemImage: "photo.on.rectangle") {
+                        Task { await model.apply(wallpaper) }
+                    }
+                    .buttonStyle(PrimaryCapsuleStyle())
+                    .disabled(model.isApplying)
+                    Button { stepPreview(1) } label: { Image(systemName: "chevron.right").frame(width: 22, height: 22) }
+                        .glassControl()
+                        .keyboardShortcut(.rightArrow, modifiers: [])
+                        .help("下一張（→）")
+                }
+                .padding(.bottom, 22)
+            }
+        }
+        .transition(.opacity)
     }
 
     private func browse(_ delta: Int) {
@@ -1519,6 +1604,13 @@ private func templateDisplayTitle(_ id: String) -> String? {
     case "architecture-arcade": return L("建築光影")
     case "animation-coast": return L("手繪動畫")
     case "gradient-tide": return L("柔和漸層")
+    case "solid-color": return L("純色")
+    case "gradient-soft": return L("漸層")
+    case "dark-oled": return L("深色")
+    case "geometric": return L("幾何")
+    case "city": return L("城市")
+    case "animals": return L("動物")
+    case "render-3d": return L("3D 立體")
     default: return nil
     }
 }

@@ -92,6 +92,13 @@ enum WallpaperPalette {
         case "水彩": return hex(0x40C8E0)
         case "建築": return hex(0xC9A26B)
         case "動畫": return hex(0xFF6482)
+        case "純色": return hex(0x64D2FF)
+        case "漸層": return hex(0xBF5AF2)
+        case "深色": return hex(0x48484A)
+        case "幾何": return hex(0x0A84FF)
+        case "城市": return hex(0xFF453A)
+        case "動物": return hex(0xA2845E)
+        case "3D": return hex(0x5AC8FA)
         default: return hex(0x636366)
         }
     }
@@ -106,6 +113,13 @@ enum WallpaperPalette {
         case "水彩": return "paintpalette.fill"
         case "建築": return "building.columns.fill"
         case "動畫": return "film.fill"
+        case "純色": return "circle.fill"
+        case "漸層": return "circle.lefthalf.filled"
+        case "深色": return "moon.fill"
+        case "幾何": return "hexagon.fill"
+        case "城市": return "building.2.fill"
+        case "動物": return "pawprint.fill"
+        case "3D": return "cube.fill"
         default: return "photo"
         }
     }

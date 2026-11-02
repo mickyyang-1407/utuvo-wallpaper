@@ -150,7 +150,9 @@ final class AppModel: ObservableObject {
         dailyError = nil
         defer { isDailyRunning = false; reload() }
         do {
-            let service = DailyGenerationService(provider: try provider(), paths: paths, target: DeviceScreen.nativePixels,
+            // 只選純色／漸層：本機畫，不需要 API key。
+            let source: ImageProvider = dailyRecipe.isLocalOnly ? ((try? provider()) ?? LocalOnlyProvider()) : try provider()
+            let service = DailyGenerationService(provider: source, paths: paths, target: DeviceScreen.nativePixels,
                                                  recipe: dailyRecipe)
             _ = try await GenerationLease.shared.run {
                 try await service.run(day: AppPaths.dayString(Date())) { done, total in
@@ -317,4 +319,10 @@ enum BackgroundScheduler {
         }
         task.expirationHandler = { work.cancel() }
     }
+}
+
+/// 只畫純色／漸層時用：本機規格在送出前就畫好，萬一被叫到就回報缺 key。
+struct LocalOnlyProvider: ImageProvider {
+    func generateImage(prompt: String) async throws -> Data { throw GenerationError.missingCredential }
+    func relight(reference: Data, prompt: String) async throws -> Data { throw GenerationError.missingCredential }
 }
