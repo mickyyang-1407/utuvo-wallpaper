@@ -4,7 +4,7 @@ import AppKit
 /// 命令列模式。
 enum CLIMode {
     case exportDynamic(URL)
-    case generateOnce(outputDirectory: URL, count: Int)
+    case generateOnce(outputDirectory: URL, count: Int, styles: [String])
     case inspectDisplays
     case desktopSmoke(imageURL: URL)
     case selfTest
@@ -46,7 +46,12 @@ enum CLI {
                    let value = Int(arguments[flagIndex + 1]) {
                     count = max(1, min(10, value))
                 }
-                return .generateOnce(outputDirectory: dir, count: count)
+                // --styles a,b,c：只用這些風格（範本 id）；純色／漸層不需要 API key。
+                var styles: [String] = []
+                if let flagIndex = arguments.firstIndex(of: "--styles"), flagIndex + 1 < arguments.count {
+                    styles = arguments[flagIndex + 1].split(separator: ",").map(String.init)
+                }
+                return .generateOnce(outputDirectory: dir, count: count, styles: styles)
             case "--desktop-smoke":
                 guard index + 1 < arguments.count else {
                     FileHandle.standardError.write(Data("用法：--desktop-smoke <絕對路徑的圖片>\n".utf8))
@@ -101,8 +106,8 @@ enum CLI {
             return await SelfTest.run()
         case .inspectDisplays:
             return await inspectDisplays()
-        case .generateOnce(let dir, let count):
-            return await generateOnce(directory: dir, count: count)
+        case .generateOnce(let dir, let count, let styles):
+            return await generateOnce(directory: dir, count: count, styles: styles)
         case .desktopSmoke(let url):
             return await desktopSmoke(url)
         }
@@ -154,11 +159,13 @@ enum CLI {
 
     // MARK: - --generate-once
 
-    private static func generateOnce(directory: URL, count: Int) async -> Int32 {
-        guard let key = CredentialStore.load() else {
-            return fail(GenerationError.missingCredential.localizedDescription)
-        }
-        let service = GenerationService(provider: OpenAIImageProvider(apiKey: key))
+    private static func generateOnce(directory: URL, count: Int, styles: [String]) async -> Int32 {
+        let recipe = DailyRecipe(styles: PromptTemplate.shared.map(\.id).filter(styles.contains))
+        let provider: any ImageProvider
+        if let key = CredentialStore.load() { provider = OpenAIImageProvider(apiKey: key) }
+        else if recipe.isLocalOnly && !recipe.styles.isEmpty { provider = LocalOnlyProvider() }
+        else { return fail(GenerationError.missingCredential.localizedDescription) }
+        let service = GenerationService(provider: provider, recipe: recipe)
         do {
             let results = try await service.generate(count: count, outputRoot: directory) { done, total in
                 print("已產生 \(done)/\(total)")
