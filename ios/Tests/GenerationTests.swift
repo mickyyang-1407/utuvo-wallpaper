@@ -154,8 +154,12 @@ final class SceneGenerationTests: XCTestCase {
         _ = try await SceneGenerationService(provider: provider, paths: paths, target: target).generate(prompt: "harbor", id: "s2")
         XCTAssertEqual(provider.prompts.count, 1)
         XCTAssertEqual(provider.relightPrompts.count, 3)
-        XCTAssertTrue(provider.relightPrompts.allSatisfy { $0.contains("Preserve the identical camera") })
-        XCTAssertTrue(provider.relightPrompts[2].contains("deep night"))
+        XCTAssertTrue(provider.relightPrompts.allSatisfy {
+            $0.contains("Keep the identical framing") && $0.contains("Keep its art style") && $0.contains("9:16") && !$0.contains("cabin")
+        })
+        XCTAssertTrue(provider.relightPrompts[2].contains("night:"))
+        XCTAssertTrue(provider.prompts[0].contains("harbor") && provider.prompts[0].contains("Follow the art style")
+                      && !provider.prompts[0].contains("photographic"), "不強迫寫實風景")
     }
 
     func testEmptyScenePromptRejectedBeforeRequest() async {

@@ -88,7 +88,7 @@ struct ContentView: View {
     @State private var showGeneration = false
     @State private var showSchedule = false
     @State private var showSettings = false
-    @State private var scenePrompt = L("山間湖畔的一間木屋、遠山、樹林與平靜倒影，固定視角，溫暖寫實攝影")
+    @State private var scenePrompt = ""
     @State private var previewPhase: DynamicPhase?
     @State private var hoverPhase: DynamicPhase?
     @State private var scenes: [DynamicSceneEntry] = []
@@ -1081,7 +1081,7 @@ struct ContentView: View {
             .pickerStyle(.segmented).labelsHidden()
             if model.dynamicAutoFrequency == .off {
                 HStack(alignment: .top, spacing: 8) {
-                    TextField("描述同一個場景", text: $scenePrompt, axis: .vertical)
+                    TextField("描述同一個場景", text: $scenePrompt, prompt: Text(L("例如：手繪動畫風的海邊小鎮巷弄、窗台上打盹的貓（水彩）、雨天的街角咖啡店")), axis: .vertical)
                         .lineLimit(2...4)
                         .glassField()
                     InspirationButton {

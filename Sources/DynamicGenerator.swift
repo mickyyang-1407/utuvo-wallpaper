@@ -65,11 +65,7 @@ struct DynamicGenerator {
         let base: Data
         if FileManager.default.fileExists(atPath: baseURL.path) { base = try Data(contentsOf: baseURL) }
         else {
-            base = try await provider.generateImage(prompt: """
-            Create one calm photographic desktop landscape: \(prompt).
-            Clear daytime lighting, fixed tripod, wide 16:9 composition, no text or watermark.
-            Strong stable silhouettes and detailed natural materials. This is the exact reference for a day/night set.
-            """)
+            base = try await provider.generateImage(prompt: ScenePrompt.base(prompt, canvas: .desktop))
             try ImageResampler.writePNG(base, to: baseURL)
         }
         for (index, phase) in [DynamicPhase.day, .dawn, .dusk, .night].enumerated() {
@@ -78,20 +74,7 @@ struct DynamicGenerator {
             let png: Data
             if FileManager.default.fileExists(atPath: native.path) { png = try Data(contentsOf: native) }
             else {
-                let lighting: String
-                switch phase {
-                case .day: lighting = "clear daytime"
-                case .dawn: lighting = "early dawn, pale pink horizon, low golden light, cool mist"
-                case .dusk: lighting = "sunset twilight, warm amber horizon and cool violet shadows"
-                case .night: lighting = "deep night, dark blue sky with stars, subtle moonlight and warm cabin window lights"
-                }
-                png = try await provider.relight(reference: base, prompt: """
-                Relight this exact reference photograph to \(lighting).
-                Preserve the identical camera, framing, perspective, horizon, terrain, buildings,
-                trees, shoreline and all object positions. Change only illumination, exposure,
-                sky color and physically appropriate reflections. No new objects, text or watermark.
-                Output the same wide 16:9 scene, fully aligned to the reference.
-                """)
+                png = try await provider.relight(reference: base, prompt: ScenePrompt.relight(phase.rawValue, canvas: .desktop))
                 try ImageResampler.writePNG(png, to: native)
             }
             let jpeg = try ImageResampler.resampleToJPEG6K(pngData: png)

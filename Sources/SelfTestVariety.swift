@@ -221,6 +221,24 @@ extension SelfTest {
                    && manualResume.sceneID == hard.sceneID && manualResume.attempts < DynamicAutoState.maxAttempts,
                manualAgain.prompt)
 
+        // 日夜提示詞：照使用者寫的畫風畫，不強迫寫實風景；換時段保留畫風、不憑空加木屋。
+        let ghibli = "隨意的吉卜力風格"
+        let basePrompts = [ScenePrompt.base(ghibli, canvas: .desktop), ScenePrompt.base(ghibli, canvas: .phone)]
+        let relights = ScenePrompt.phases.flatMap { [ScenePrompt.relight($0, canvas: .desktop), ScenePrompt.relight($0, canvas: .phone)] }
+        record("日夜提示詞：保留使用者的畫風、不限風景；換時段只改光線、保留畫風",
+               basePrompts.allSatisfy { $0.contains(ghibli) && $0.contains("Follow the art style")
+                   && !$0.contains("photographic") && !$0.contains("landscape:") }
+                   && basePrompts[0].contains("16:9") && basePrompts[1].contains("9:16")
+                   && relights.allSatisfy { $0.contains("Keep its art style") && !$0.contains("cabin") && !$0.contains("photograph") }
+                   && ScenePrompt.relight("night", canvas: .phone).contains("night"),
+               "\(basePrompts[0].count)／\(relights.count) 段")
+        let autoPicks = (0..<120).map { DynamicAutoPlanner.pick(period: "v\($0)", season: .spring, recent: [], chinese: true) }
+        let indoorIDs: Set<String> = ["reading-nook", "corner-cafe", "window-cat", "studio-desk", "old-kitchen", "bookshop"]
+        let pickedStyles = Set(autoPicks.compactMap { pick in DynamicAutoPlanner.styles.first { pick.prompt.hasSuffix($0.zh) }?.zh })
+        record("AI 自動：題材不只風景（室內、街角、小動物），畫風也會輪替",
+               autoPicks.contains { indoorIDs.contains($0.subject) } && pickedStyles.count >= 4,
+               "室內 \(autoPicks.filter { indoorIDs.contains($0.subject) }.count)／120、畫風 \(pickedStyles.count) 種")
+
         let summer = (0..<40).map { DynamicAutoPlanner.pick(period: "p\($0)", season: .summer, recent: [], chinese: true).subject }
         let winterOnly = Set(DynamicAutoPlanner.subjects.filter(\.winterOnly).map(\.id))
         let recent = Array(DynamicAutoPlanner.subjects.prefix(6).map(\.id))

@@ -8,7 +8,7 @@ import json, pathlib, re, subprocess, sys, tempfile
 
 IOS = pathlib.Path(__file__).resolve().parent.parent
 REPO = IOS.parent
-SRC = sorted((IOS / "App").rglob("*.swift")) + [REPO / "Sources/PromptTemplates.swift", REPO / "Sources/DailyBatch.swift", REPO / "Sources/AppLanguage.swift", REPO / "Sources/DynamicSchedule.swift", REPO / "Sources/DynamicAuto.swift", REPO / "Sources/LocalArt.swift"]
+SRC = sorted((IOS / "App").rglob("*.swift")) + [REPO / "Sources/PromptTemplates.swift", REPO / "Sources/DailyBatch.swift", REPO / "Sources/AppLanguage.swift", REPO / "Sources/DynamicSchedule.swift", REPO / "Sources/DynamicAuto.swift", REPO / "Sources/LocalArt.swift", REPO / "Sources/AppDefaults.swift", REPO / "Sources/ScenePrompts.swift"]
 TABLES = {lang: IOS / f"Localization/{lang}.lproj/Localizable.strings" for lang in ("en", "zh-Hant")}
 INFOPLIST_KEYS = ["CFBundleDisplayName", "NSPhotoLibraryAddUsageDescription"]
 

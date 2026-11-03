@@ -81,7 +81,7 @@ enum DynamicAutoPlanner {
         var winterOnly = false
     }
 
-    /// 構圖固定、輪廓清楚的場景，換光線時才對得齊。
+    /// 構圖固定、輪廓清楚的場景，換光線時才對得齊。不只風景：室內、街角、小動物也會隨時間變化。
     static let subjects: [Subject] = [
         Subject(id: "lake-cabin", zh: "山間湖畔的木屋與松林", en: "a wooden cabin beside a still mountain lake with pine forest"),
         Subject(id: "lighthouse", zh: "海岬岩岸上的白色燈塔", en: "a white lighthouse on a rocky headland above the sea"),
@@ -104,8 +104,28 @@ enum DynamicAutoPlanner {
         Subject(id: "skyline", zh: "隔著港灣的城市天際線", en: "a city skyline across a calm harbor"),
         Subject(id: "orchard", zh: "果園裡的石砌小屋", en: "a small stone cottage in an orchard"),
         Subject(id: "tidal-walk", zh: "潮間帶上的木棧道", en: "a wooden boardwalk across tidal flats"),
+        Subject(id: "reading-nook", zh: "窗邊的閱讀角落，書架、扶手椅和窗外的街道", en: "a reading nook by a window with bookshelves, an armchair and the street outside"),
+        Subject(id: "corner-cafe", zh: "從對街看過去的街角小咖啡店", en: "a small corner café seen from across the street"),
+        Subject(id: "rooftop-garden", zh: "城市屋頂上的小菜園與曬衣繩", en: "a small rooftop vegetable garden with a washing line above the city"),
+        Subject(id: "country-station", zh: "鄉間小火車站的月台與長椅", en: "the platform and bench of a small country train station"),
+        Subject(id: "bookshop", zh: "老書店的櫥窗與門口", en: "the shop window and doorway of an old bookshop"),
+        Subject(id: "window-cat", zh: "窗台上打盹的貓、盆栽和窗外的天空", en: "a cat napping on a windowsill with potted plants and the sky outside"),
+        Subject(id: "studio-desk", zh: "靠窗的工作桌、檯燈與窗外的城市", en: "a desk by a window with a desk lamp and the city outside"),
+        Subject(id: "lantern-lane", zh: "掛著燈籠的老街巷弄", en: "an old narrow lane hung with paper lanterns"),
+        Subject(id: "tram-stop", zh: "停在終點站的路面電車", en: "a tram waiting at its last stop"),
+        Subject(id: "old-kitchen", zh: "老房子的廚房，窗邊擺著植物", en: "the kitchen of an old house with plants on the windowsill"),
+        Subject(id: "lakeside-camp", zh: "湖邊的露營帳篷與營火", en: "a tent and campfire by a lake"),
         Subject(id: "alpine-hut", zh: "鋸齒雪峰下的高山小屋", en: "an alpine hut below jagged snowy peaks", winterOnly: true),
         Subject(id: "onsen-inn", zh: "雪谷裡的溫泉旅館", en: "a hot-spring inn in a snowy valley", winterOnly: true),
+    ]
+
+    /// 畫風輪替：不只寫實照片。
+    static let styles: [(zh: String, en: String)] = [
+        ("溫暖寫實攝影", "warm realistic photograph"),
+        ("手繪動畫背景", "hand-painted animation background art"),
+        ("柔和水彩插畫", "soft watercolor illustration"),
+        ("厚塗插畫", "rich gouache painting"),
+        ("柔和 3D 動畫電影質感", "soft 3D animated film look"),
     ]
 
     static let weathers: [(zh: String, en: String)] = [
@@ -155,6 +175,7 @@ enum DynamicAutoPlanner {
         let hash = stableHash("\(period)#\(salt)")
         let subject = pool[Int(hash % UInt64(pool.count))]
         let weather = weathers[Int((hash >> 20) % UInt64(weathers.count))]
+        let style = styles[Int((hash >> 40) % UInt64(styles.count))]
         let seasonText: (zh: String, en: String)
         switch season {
         case .spring: seasonText = ("春天", "spring")
@@ -162,8 +183,8 @@ enum DynamicAutoPlanner {
         case .autumn: seasonText = ("秋天", "autumn")
         case .winter: seasonText = ("冬天", "winter")
         }
-        let prompt = chinese ? "\(subject.zh)，\(seasonText.zh)，\(weather.zh)"
-                             : "\(subject.en), \(seasonText.en), \(weather.en)"
+        let prompt = chinese ? "\(subject.zh)，\(seasonText.zh)，\(weather.zh)，\(style.zh)"
+                             : "\(subject.en), \(seasonText.en), \(weather.en), \(style.en)"
         return (subject.id, prompt)
     }
 

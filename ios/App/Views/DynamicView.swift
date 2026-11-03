@@ -93,7 +93,7 @@ struct DynamicView: View {
             }
             if model.dynamicAutoFrequency == .off {
                 HStack(alignment: .top, spacing: 8) {
-                    TextField(L("例如：湖邊的小木屋與松林"), text: $prompt, axis: .vertical)
+                    TextField(L("例如：手繪動畫風的海邊小鎮巷弄、窗台上打盹的貓（水彩）、雨天的街角咖啡店"), text: $prompt, axis: .vertical)
                         .lineLimit(2...4).focused($focused)
                         .glassField()
                     InspirationButton {

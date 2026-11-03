@@ -41,30 +41,8 @@ enum DayPhase: String, CaseIterable, Identifiable, Codable, Sendable {
         DynamicSchedule.load(defaults).phase(at: date, isDark: false, calendar: calendar)
     }
 
-    /// 白天直接用生成的底圖，其餘三個時段用 edits 換光線。
-    var relightPrompt: String {
-        let lighting: String
-        switch self {
-        case .day: lighting = "clear daytime"
-        case .dawn: lighting = "early dawn, pale pink horizon, low golden light, cool mist"
-        case .dusk: lighting = "sunset twilight, warm amber horizon and cool violet shadows"
-        case .night: lighting = "deep night, dark blue sky with stars, subtle moonlight and warm cabin window lights"
-        }
-        return """
-        Relight this exact reference photograph to \(lighting).
-        Preserve the identical camera, framing, perspective, horizon, terrain, buildings,
-        trees, shoreline and all object positions. Change only illumination, exposure,
-        sky color and physically appropriate reflections. No new objects, text or watermark.
-        Output the same vertical 9:16 scene, fully aligned to the reference.
-        """
-    }
+    /// 白天直接用生成的底圖，其餘三個時段用 edits 換光線（提示詞與 Mac 共用 ScenePrompt）。
+    var relightPrompt: String { ScenePrompt.relight(rawValue, canvas: .phone) }
 
-    static func basePrompt(scene: String) -> String {
-        """
-        Create one calm photographic phone landscape: \(scene).
-        Clear daytime lighting, fixed tripod, vertical 9:16 iPhone wallpaper composition, no text or watermark.
-        Strong stable silhouettes and detailed natural materials. Keep the main subject in the middle and lower \
-        two thirds so the clock area at the top stays calm. This is the exact reference for a day/night set.
-        """
-    }
+    static func basePrompt(scene: String) -> String { ScenePrompt.base(scene, canvas: .phone) }
 }
