@@ -141,11 +141,13 @@ extension SelfTest {
         let englishIdea = PromptInspiration.pick(categories: ["水彩"], current: "", chinese: false)
         // 純色、漸層沒有主題，其他每個分類都要有點子。
         let allCovered = DailyRecipe.categories.filter { !$0.hasPrefix("純色") && !$0.hasPrefix("漸層") }
-            .allSatisfy { (PromptInspiration.ideas[$0]?.count ?? 0) >= 5 }
-        record("AI 靈感：只挑選到的分類、不重複目前內容、英文介面給英文、每個分類都有點子",
-               picks.allSatisfy { cosmic.contains($0) && $0 != cosmic[0] } && Set(picks).count > 1
-                   && PromptInspiration.ideas["水彩"]!.map(\.en).contains(englishIdea) && allCovered,
-               picks.prefix(3).joined(separator: "／"))
+            .allSatisfy { (PromptInspiration.ideas[$0]?.count ?? 0) >= 20 }
+        let spread = Set((0..<400).map { _ in PromptInspiration.pick(categories: [], current: "", chinese: true) })
+        record("AI 靈感：只挑選到的分類、不重複目前內容、英文介面給英文、每個分類 20 句以上、搭配細節後很少重複",
+               picks.allSatisfy { pick in pick != cosmic[0] && cosmic.contains { pick.hasPrefix($0) } } && Set(picks).count > 1
+                   && PromptInspiration.ideas["水彩"]!.map(\.en).contains { englishIdea.hasPrefix($0) } && allCovered
+                   && spread.count >= 300,
+               "400 次有 \(spread.count) 種：" + picks.prefix(2).joined(separator: "／"))
 
         // 純色／漸層：本機畫出正確尺寸的 PNG，生成時不送 API。
         let solidPNG = LocalArt.render("local:solid:#264653", width: 384, height: 216)

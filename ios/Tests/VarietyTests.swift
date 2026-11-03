@@ -79,7 +79,7 @@ final class VarietyTests: XCTestCase {
         for _ in 0..<20 {
             let idea = PromptInspiration.pick(categories: ["建築"], current: current, chinese: true)
             XCTAssertNotEqual(idea, current)
-            XCTAssertTrue(PromptInspiration.ideas["建築"]!.map(\.zh).contains(idea))
+            XCTAssertTrue(PromptInspiration.ideas["建築"]!.map(\.zh).contains { idea.hasPrefix($0) }, idea)
         }
     }
 
