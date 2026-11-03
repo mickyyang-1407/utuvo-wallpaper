@@ -36,6 +36,10 @@ struct RootView: View {
                 BackgroundScheduler.schedule()
             }
         }
+        .sheet(item: $model.shortcutSetup) { reason in
+            ShortcutSetupSheet(reason: reason).environmentObject(model)
+        }
+        .onOpenURL { model.handleShortcutCallback($0) }
         .alert(model.message ?? "", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button(L("好")) { model.message = nil }
         }

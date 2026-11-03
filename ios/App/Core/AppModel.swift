@@ -40,6 +40,8 @@ final class AppModel: ObservableObject {
     @Published var keyFromEnvironment = false
     @Published var usedBytes = 0
     @Published var message: String?
+    /// 「設為桌布」要用的捷徑還沒設定好（或剛剛執行失敗）：顯示設定說明。
+    @Published var shortcutSetup: ShortcutSetupReason?
 
     let paths = AppPaths.shared
     let prefs = Preferences()
@@ -111,6 +113,34 @@ final class AppModel: ObservableObject {
         if favorites.contains(item.id) { favorites.remove(item.id) } else { favorites.insert(item.id) }
         prefs.favorites = favorites
     }
+
+    /// 「設為桌布」：固定這張，回傳要開的捷徑網址；捷徑還沒成功跑過就先顯示設定說明、回傳 nil。
+    func applyURL(for item: WallpaperItem) -> URL? {
+        pinnedID = item.id
+        prefs.pinnedID = item.id
+        guard prefs.defaults.bool(forKey: Self.shortcutReadyKey) else { shortcutSetup = .firstTime; return nil }
+        return ApplyShortcut.runURL
+    }
+
+    /// 捷徑跑完回到 App。回傳 false＝不是捷徑的回呼。
+    @discardableResult
+    func handleShortcutCallback(_ url: URL) -> Bool {
+        guard let outcome = ApplyShortcut.outcome(of: url) else { return false }
+        switch outcome {
+        case .done:
+            prefs.defaults.set(true, forKey: Self.shortcutReadyKey)
+            shortcutSetup = nil
+            message = L("已換成這張桌布。")
+        case .cancelled:
+            break
+        case .failed(let text):
+            prefs.defaults.set(false, forKey: Self.shortcutReadyKey)
+            shortcutSetup = .failed(text)
+        }
+        return true
+    }
+
+    static let shortcutReadyKey = "shortcut.applyReady"
 
     func togglePin(_ item: WallpaperItem) {
         pinnedID = pinnedID == item.id ? nil : item.id

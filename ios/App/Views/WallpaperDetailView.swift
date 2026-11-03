@@ -3,6 +3,7 @@ import SwiftUI
 struct WallpaperDetailView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     let item: WallpaperItem
     @State private var shareURL: URL?
     @State private var confirmDelete = false
@@ -18,6 +19,8 @@ struct WallpaperDetailView: View {
                 HStack(spacing: 14) {
                     roundButton(isFavorite ? "heart.fill" : "heart", isFavorite ? L("已收藏") : L("收藏"),
                                 tint: isFavorite ? TileStyle.favorites.color : .primary) { model.toggleFavorite(item) }
+                    roundButton(isPinned ? "pin.fill" : "pin", isPinned ? L("已固定") : L("固定這張"),
+                                tint: isPinned ? Palette.green : .primary) { model.togglePin(item) }
                     roundButton("square.and.arrow.down", L("儲存到照片")) { Task { await model.saveToPhotos(item) } }
                     if let shareURL {
                         ShareLink(item: shareURL) { roundLabel("square.and.arrow.up", L("分享"), tint: .primary) }
@@ -52,8 +55,8 @@ struct WallpaperDetailView: View {
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
             }
             Spacer(minLength: 4)
-            Button { model.togglePin(item) } label: {
-                Text(isPinned ? L("已設為目前桌布") : L("設為目前桌布")).lineLimit(1).fixedSize()
+            Button { model.apply(item, openURL: openURL) } label: {
+                Label(L("設為桌布"), systemImage: "iphone").lineLimit(1).fixedSize()
             }
             .buttonStyle(PrimaryButtonStyle())
             .layoutPriority(1)

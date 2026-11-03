@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GalleryView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.openURL) private var openURL
     @Binding var tab: RootTab
     @State private var filter: GalleryFilter = {
         if let raw = UserDefaults.standard.string(forKey: "UTUVOInitialFilter") {
@@ -289,11 +290,11 @@ struct GalleryView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 if let item = selected {
-                    Text(L("已選 1 張")).font(.subheadline.weight(.semibold))
+                    Text(L("已選 1 張")).font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize()
                     Text(verbatim: "\(resolution(item)) · \(WallpaperCategory.title(item.category))")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
                 } else {
-                    Text(L("未選取")).font(.subheadline.weight(.semibold))
+                    Text(L("未選取")).font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize()
                     Text(L("點一張桌布來選取")).font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -305,12 +306,13 @@ struct GalleryView: View {
                     .accessibilityLabel(L("打開"))
             }
             Button {
-                if let item = selected { model.togglePin(item) }
+                if let item = selected { model.apply(item, openURL: openURL) }
             } label: {
-                Text(selected.map { model.pinnedID == $0.id } == true ? L("已設為目前桌布") : L("設為目前桌布"))
-                    .lineLimit(1).minimumScaleFactor(0.8)
+                Label(L("設為桌布"), systemImage: "iphone")
+                    .lineLimit(1).fixedSize()
             }
             .buttonStyle(PrimaryButtonStyle())
+            .layoutPriority(1)
             .disabled(selected == nil)
         }
         .padding(6)

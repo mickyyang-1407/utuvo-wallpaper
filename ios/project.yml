@@ -10,7 +10,7 @@ settings:
     SWIFT_VERSION: "5.0"
     DEVELOPMENT_TEAM: RPNT54P79S
     MARKETING_VERSION: 0.1.0
-    CURRENT_PROJECT_VERSION: 10
+    CURRENT_PROJECT_VERSION: 11
     TARGETED_DEVICE_FAMILY: "1"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 targets:
@@ -66,6 +66,9 @@ targets:
           UIColorName: ""
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.utuvo.wallpaper
+            CFBundleURLSchemes: [utuvowallpaper]
         NSLocationWhenInUseUsageDescription: "UTUVO Wallpaper 用你的大約位置計算日出日落，讓日夜桌布準時切換。位置只存在這支 iPhone。"
         UIApplicationSupportsIndirectInputEvents: true
         ITSAppUsesNonExemptEncryption: false
