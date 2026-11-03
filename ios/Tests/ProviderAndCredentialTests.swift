@@ -8,7 +8,7 @@ final class OpenAIProviderTests: XCTestCase {
     override func setUp() { StubURLProtocol.reset() }
 
     private func provider() -> OpenAIImageProvider {
-        OpenAIImageProvider(apiKey: fakeKey, configuration: StubURLProtocol.configuration())
+        OpenAIImageProvider(apiKey: fakeKey, configuration: StubURLProtocol.configuration(), background: false)
     }
 
     func testGenerationRequestShape() async throws {

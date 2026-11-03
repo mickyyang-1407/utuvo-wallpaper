@@ -21,7 +21,7 @@ final class ProviderFactoryTests: XCTestCase {
         XCTAssertTrue(ProviderFactory.usesFakeProvider(defaults))
         // 有 key 也一樣走假 provider，不會連網
         let provider = try ProviderFactory.make(store: store, defaults: defaults, environment: ["OPENAI_API_KEY": "sk-test-fake"])
-        XCTAssertTrue(provider is FakeImageProvider)
+        XCTAssertTrue((provider as? LoggingImageProvider)?.base is FakeImageProvider)
     }
 
     func testWithoutFlagNeedsCredential() throws {
@@ -30,7 +30,7 @@ final class ProviderFactoryTests: XCTestCase {
             XCTAssertEqual($0 as? GenerationError, .missingCredential)
         }
         let provider = try ProviderFactory.make(store: store, defaults: defaults, environment: ["OPENAI_API_KEY": "sk-test-fake"])
-        XCTAssertTrue(provider is OpenAIImageProvider)   // 只建立，不送請求
+        XCTAssertTrue((provider as? LoggingImageProvider)?.base is OpenAIImageProvider)   // 只建立，不送請求
     }
 
     func testBackgroundDailyRunUsesFactoryProvider() async throws {

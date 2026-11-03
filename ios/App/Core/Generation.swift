@@ -46,7 +46,9 @@ struct DailyGenerationService: Sendable {
                 do {
                     png = try await provider.generateImage(prompt: PortraitPrompt.convert(planned.prompt))
                 } catch {
-                    batch.retryAfter = DailyBatch.isRetryable(error) && batch.attempts[index] < 3
+                    // 背景時間用完被系統中斷（取消）也算暫時性：這一批稍後續作，不會整天停住。
+                    let retryable = DailyBatch.isRetryable(error) || DynamicAutoState.isCancellation(error)
+                    batch.retryAfter = retryable && batch.attempts[index] < 3
                         ? now().addingTimeInterval(batch.attempts[index] == 1 ? 60 : 300) : nil
                     try batch.save(root: paths.root, day: day)
                     throw error

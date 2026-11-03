@@ -76,6 +76,15 @@ extension AppModel {
     func apply(_ item: WallpaperItem?, openURL: OpenURLAction) {
         let url: URL?
         if let item { url = applyURL(for: item) } else { url = ApplyShortcut.runURL }
+        run(url, openURL: openURL)
+    }
+
+    /// 「套用日夜桌布」：開日夜模式並立刻換成目前時段那張。
+    func applyDynamic(openURL: OpenURLAction) {
+        run(applyDynamicURL(), openURL: openURL)
+    }
+
+    private func run(_ url: URL?, openURL: OpenURLAction) {
         guard let url else { return }
         openURL(url) { [weak self] accepted in
             if !accepted { self?.shortcutSetup = .failed(L("找不到「捷徑」App。")) }

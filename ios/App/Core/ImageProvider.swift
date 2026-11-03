@@ -12,21 +12,34 @@ protocol ImageProvider: Sendable {
 /// - 每次只送一個請求（序列）。
 /// - 錯誤只帶 HTTP 狀態碼；不記 body、header、key。
 struct OpenAIImageProvider: ImageProvider {
-    static let generationsURL = URL(string: "https://api.openai.com/v1/images/generations")!
-    static let editsURL = URL(string: "https://api.openai.com/v1/images/edits")!
+    static var generationsURL: URL { base.appendingPathComponent("v1/images/generations") }
+    static var editsURL: URL { base.appendingPathComponent("v1/images/edits") }
+    private static var base: URL {
+        #if DEBUG
+        // Debug 專用：`-UTUVOAPIBase http://127.0.0.1:PORT` 指到本機假伺服器測連線（Release 不編入）。
+        if let text = UserDefaults.standard.string(forKey: "UTUVOAPIBase"), let url = URL(string: text) { return url }
+        #endif
+        return URL(string: "https://api.openai.com")!
+    }
     static let model = "gpt-image-2"
     static let size = "2160x3840"
     static let quality = "high"
 
     let apiKey: String
     let session: URLSession
+    /// 送生圖請求用的通道。正式環境走背景 session：切到別的 App 時請求不會斷。
+    let transfer: ImageTransfer
 
-    init(apiKey: String, timeout: TimeInterval = 180, configuration: URLSessionConfiguration = .ephemeral) {
+    /// `background` false＝生圖請求也走 `configuration` 這個一般 session（測試用 stub）。
+    init(apiKey: String, timeout: TimeInterval = 180, configuration: URLSessionConfiguration = .ephemeral,
+         background: Bool = true) {
         self.apiKey = apiKey
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout * 2
         configuration.waitsForConnectivity = false
-        self.session = URLSession(configuration: configuration)
+        let session = URLSession(configuration: configuration)
+        self.session = session
+        self.transfer = background ? BackgroundTransfer.shared : SessionTransfer(session: session)
     }
 
     static func validatePrompt(_ prompt: String) throws -> String {
@@ -79,7 +92,7 @@ struct OpenAIImageProvider: ImageProvider {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await transfer.send(request)
         } catch let error as URLError {
             switch error.code {
             case .cancelled: throw GenerationError.cancelled
@@ -112,5 +125,78 @@ struct OpenAIImageProvider: ImageProvider {
             return remote
         }
         throw GenerationError.invalidResponse
+    }
+}
+
+/// 送一個請求、拿回整個回應。
+protocol ImageTransfer: Sendable {
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+struct SessionTransfer: ImageTransfer {
+    let session: URLSession
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) { try await session.data(for: request) }
+}
+
+/// 背景 URLSession：一張圖要 1–3 分鐘，使用者切到別的 App 時 iOS 會暫停 App，一般連線就斷了。
+/// 背景 session 由系統代為收送，App 回到前景時接著拿到結果。
+/// 請求本文先寫到暫存檔（背景 session 只接受從檔案上傳）。
+final class BackgroundTransfer: NSObject, ImageTransfer, URLSessionDataDelegate, @unchecked Sendable {
+    static let identifier = "com.utuvo.wallpaper.images"
+    static let shared = BackgroundTransfer(configuration: .background(withIdentifier: identifier))
+
+    private let lock = NSLock()
+    private var buffers: [Int: Data] = [:]
+    private var waiters: [Int: CheckedContinuation<(Data, URLResponse), Error>] = [:]
+    private var session: URLSession!
+    /// 這次啟動送出的請求都標上它。上次啟動留下、已經沒人在等的請求（App 被系統關掉時系統會繼續送、
+    /// 斷線還會自己重送）一律取消，免得多付一張拿不到的圖。
+    private let launchToken = UUID().uuidString
+
+    init(configuration: URLSessionConfiguration) {
+        super.init()
+        configuration.isDiscretionary = false
+        configuration.sessionSendsLaunchEvents = false
+        configuration.timeoutIntervalForRequest = 300
+        configuration.timeoutIntervalForResource = 900
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+        let token = launchToken
+        session.getAllTasks { tasks in
+            for task in tasks where task.taskDescription != token { task.cancel() }
+        }
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("upload-\(UUID().uuidString)")
+        try (request.httpBody ?? Data()).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        var bare = request
+        bare.httpBody = nil
+        let task = session.uploadTask(with: bare, fromFile: file)
+        task.taskDescription = launchToken
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.withLock { waiters[task.taskIdentifier] = continuation }
+                task.resume()
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.withLock { buffers[dataTask.taskIdentifier, default: Data()].append(data) }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let (waiter, data) = lock.withLock {
+            (waiters.removeValue(forKey: task.taskIdentifier), buffers.removeValue(forKey: task.taskIdentifier) ?? Data())
+        }
+        guard let waiter else { return }
+        if let error { waiter.resume(throwing: error) }
+        else if let response = task.response { waiter.resume(returning: (data, response)) }
+        else { waiter.resume(throwing: URLError(.badServerResponse)) }
     }
 }

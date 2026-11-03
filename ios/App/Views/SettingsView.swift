@@ -150,6 +150,22 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    row("chart.bar.fill", Color(hex: 0x34C759)) {
+                        Text(L("最近 7 天生成"))
+                        Spacer()
+                        if let summary = model.generationSummary {
+                            Text(L("成功 \(summary.succeeded)／\(summary.total)")).foregroundStyle(.secondary).monospacedDigit()
+                        } else {
+                            Text(L("尚無紀錄")).foregroundStyle(.secondary)
+                        }
+                    }
+                } footer: {
+                    if let failures = model.generationSummary?.failures, !failures.isEmpty {
+                        Text(L("失敗原因：") + failures.map { "\(GenerationLog.label($0.outcome)) \($0.count)" }.joined(separator: "、"))
+                    }
+                }
+
+                Section {
                     row("internaldrive.fill", TileStyle.settings.color) {
                         Text(L("儲存空間"))
                         Spacer()

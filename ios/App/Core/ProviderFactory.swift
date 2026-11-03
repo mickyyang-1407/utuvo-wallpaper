@@ -15,12 +15,12 @@ enum ProviderFactory {
                      defaults: UserDefaults = .standard,
                      environment: [String: String] = ProcessInfo.processInfo.environment) throws -> ImageProvider {
         #if DEBUG
-        if usesFakeProvider(defaults) { return FakeImageProvider() }
+        if usesFakeProvider(defaults) { return LoggingImageProvider(base: FakeImageProvider(), paths: .shared) }
         #endif
         guard let credential = CredentialResolver.resolve(store: store, environment: environment) else {
             throw GenerationError.missingCredential
         }
-        return OpenAIImageProvider(apiKey: credential.key)
+        return LoggingImageProvider(base: OpenAIImageProvider(apiKey: credential.key), paths: .shared)
     }
 }
 

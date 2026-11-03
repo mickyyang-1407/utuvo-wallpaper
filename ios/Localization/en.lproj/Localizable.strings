@@ -149,7 +149,6 @@
 "深色" = "Dark";
 "淺色" = "Light";
 "跟著系統淺色／深色" = "Follow Light/Dark Appearance";
-"啟用後，「取得目前桌布」會依時段回傳：%@ 清晨、%@ 白天、%@ 黃昏、%@ 夜晚。" = "When on, “Get Current Wallpaper” returns dawn from %@, day from %@, dusk from %@ and night from %@.";
 "今天：清晨 %@、白天 %@、黃昏 %@、夜晚 %@" = "Today: dawn %@, day %@, dusk %@, night %@";
 "使用你的位置" = "Using your location";
 "使用目前位置" = "Use Current Location";
@@ -219,3 +218,17 @@
 "設為桌布" = "Set as Wallpaper";
 "關閉" = "Close";
 "點下面「加入捷徑」，在分享選單選「捷徑」，再點「加入捷徑」。" = "Tap Add Shortcut below, choose Shortcuts in the share sheet, then tap Add Shortcut.";
+"套用日夜桌布" = "Apply Day & Night";
+"按「套用日夜桌布」現在就換成目前時段那張。之後要每個時段自動換，請到「設定」照「捷徑自動化設定指南」建自動化。在圖庫把某一張「設為桌布」或「固定」，日夜模式會自動關閉。" = "Tap “Apply Day & Night” to switch to the current time-of-day picture now. To change it automatically through the day, set up automations with the Shortcuts automation guide in Settings. Setting or pinning a single wallpaper in the gallery turns Day & Night off.";
+"已換成日夜桌布（%@）。" = "Changed to the Day & Night wallpaper (%@).";
+"已換成這張桌布。日夜模式已關閉。" = "Wallpaper changed. Day & Night is now off.";
+"已固定這張。日夜模式已關閉。" = "Pinned. Day & Night is now off.";
+"最近 7 天生成" = "Generated in the last 7 days";
+"成功 %lld／%lld" = "%lld of %lld succeeded";
+"尚無紀錄" = "No records yet";
+"失敗原因：" = "Failures: ";
+"逾時" = "timed out";
+"連線中斷" = "connection lost";
+"被中斷" = "interrupted";
+"額度或限流" = "quota or rate limit";
+"回應無法解析" = "unreadable response";

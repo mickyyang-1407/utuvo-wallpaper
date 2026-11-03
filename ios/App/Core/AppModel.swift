@@ -39,6 +39,8 @@ final class AppModel: ObservableObject {
     @Published var keyStored = false
     @Published var keyFromEnvironment = false
     @Published var usedBytes = 0
+    /// 最近 7 天送出的生圖請求成功率。
+    @Published var generationSummary: GenerationLog.Summary?
     @Published var message: String?
     /// 「設為桌布」要用的捷徑還沒設定好（或剛剛執行失敗）：顯示設定說明。
     @Published var shortcutSetup: ShortcutSetupReason?
@@ -76,6 +78,7 @@ final class AppModel: ObservableObject {
         keyStored = (try? store.exists()) == true
         keyFromEnvironment = !keyStored && ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?.isEmpty == false
         usedBytes = paths.usedBytes()
+        generationSummary = GenerationLog.summary(GenerationLog.load(paths))
     }
 
     func provider() throws -> ImageProvider {
@@ -115,12 +118,29 @@ final class AppModel: ObservableObject {
     }
 
     /// 「設為桌布」：固定這張，回傳要開的捷徑網址；捷徑還沒成功跑過就先顯示設定說明、回傳 nil。
+    /// 日夜模式優先於固定的那張，所以選了特定一張就關掉日夜模式，不然捷徑拿到的會是日夜那張。
     func applyURL(for item: WallpaperItem) -> URL? {
         pinnedID = item.id
         prefs.pinnedID = item.id
+        pendingApplyTurnedOffDynamic = dynamicEnabled
+        dynamicEnabled = false
+        pendingApplyDynamic = false
         guard prefs.defaults.bool(forKey: Self.shortcutReadyKey) else { shortcutSetup = .firstTime; return nil }
         return ApplyShortcut.runURL
     }
+
+    /// 「套用日夜桌布」：現在就換成目前時段那張。
+    func applyDynamicURL() -> URL? {
+        dynamicEnabled = true
+        pendingApplyTurnedOffDynamic = false
+        pendingApplyDynamic = true
+        guard prefs.defaults.bool(forKey: Self.shortcutReadyKey) else { shortcutSetup = .firstTime; return nil }
+        return ApplyShortcut.runURL
+    }
+
+    /// 捷徑跑完後的訊息用：這次是否順便關掉了日夜模式、是否套用日夜桌布。
+    private var pendingApplyTurnedOffDynamic = false
+    private var pendingApplyDynamic = false
 
     /// 捷徑跑完回到 App。回傳 false＝不是捷徑的回呼。
     @discardableResult
@@ -130,7 +150,10 @@ final class AppModel: ObservableObject {
         case .done:
             prefs.defaults.set(true, forKey: Self.shortcutReadyKey)
             shortcutSetup = nil
-            message = L("已換成這張桌布。")
+            message = pendingApplyDynamic ? L("已換成日夜桌布（\(DayPhase.current(at: Date()).title)）。")
+                : pendingApplyTurnedOffDynamic ? L("已換成這張桌布。日夜模式已關閉。") : L("已換成這張桌布。")
+            pendingApplyTurnedOffDynamic = false
+            pendingApplyDynamic = false
         case .cancelled:
             break
         case .failed(let text):
@@ -145,6 +168,11 @@ final class AppModel: ObservableObject {
     func togglePin(_ item: WallpaperItem) {
         pinnedID = pinnedID == item.id ? nil : item.id
         prefs.pinnedID = pinnedID
+        // 日夜模式優先於固定：固定一張時關掉日夜模式，固定才有作用。
+        if pinnedID != nil, dynamicEnabled {
+            dynamicEnabled = false
+            message = L("已固定這張。日夜模式已關閉。")
+        }
     }
 
     func delete(_ item: WallpaperItem) {

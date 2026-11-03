@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DynamicView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.openURL) private var openURL
     @State private var prompt = ""
     @FocusState private var focused: Bool
 
@@ -68,8 +69,14 @@ struct DynamicView: View {
                 }
             }
             .padding(.vertical, 6)
-            Text(L("啟用後，「取得目前桌布」會依時段回傳：\(DayPhase.dawn.time) 清晨、\(DayPhase.day.time) 白天、\(DayPhase.dusk.time) 黃昏、\(DayPhase.night.time) 夜晚。"))
+            Button { model.applyDynamic(openURL: openURL) } label: {
+                Label(L("套用日夜桌布"), systemImage: "iphone").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .padding(.vertical, 10)
+            Text(L("按「套用日夜桌布」現在就換成目前時段那張。之後要每個時段自動換，請到「設定」照「捷徑自動化設定指南」建自動化。在圖庫把某一張「設為桌布」或「固定」，日夜模式會自動關閉。"))
                 .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 10)
         }
         .padding(.horizontal, 14)
