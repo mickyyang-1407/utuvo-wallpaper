@@ -43,6 +43,21 @@ final class DailyBatchTests: XCTestCase {
         XCTAssertEqual(seen, [1, 1])
     }
 
+    func testUndecodableImageStopsTheBatchWithoutRetrying() async throws {
+        let clock = Clock(Date(timeIntervalSince1970: 1_800_000_000))
+        let provider = ScriptedProvider([.garbage])
+        var service = DailyGenerationService(provider: provider, paths: paths, target: target, recipe: DailyRecipe(styles: PromptTemplate.shared.filter { $0.local == nil }.map(\.id)))
+        service.now = { clock.now }
+        do { _ = try await service.run(day: day, count: 2); XCTFail("expected decoding") }
+        catch { XCTAssertEqual(error as? GenerationError, .decoding) }
+        let batch = try DailyBatch.load(root: paths.root, day: day)
+        XCTAssertEqual(batch.attempts, [1, 0])
+        XCTAssertNil(batch.retryAfter)
+        clock.now = clock.now.addingTimeInterval(3600)
+        XCTAssertFalse(batch.canResume(at: clock.now))
+        XCTAssertEqual(provider.callCount, 1)
+    }
+
     func test429RetriesWithCooldownThenResumes() async throws {
         let clock = Clock(Date(timeIntervalSince1970: 1_800_000_000))
         let provider = ScriptedProvider([.ok, .fail(.httpStatus(429)), .ok])

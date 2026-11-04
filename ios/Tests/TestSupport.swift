@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 /// 假 provider：依腳本回傳成功（PNG）或錯誤；記錄每次呼叫。絕不連網。
 final class ScriptedProvider: ImageProvider, @unchecked Sendable {
-    enum Step { case ok, fail(GenerationError) }
+    enum Step { case ok, fail(GenerationError), garbage }
     private let lock = NSLock()
     private var steps: [Step]
     private(set) var prompts: [String] = []
@@ -28,6 +28,7 @@ final class ScriptedProvider: ImageProvider, @unchecked Sendable {
         switch step {
         case .ok: return TestImage.png(size: size)
         case .fail(let e): throw e
+        case .garbage: return Data("not an image".utf8)
         }
     }
 

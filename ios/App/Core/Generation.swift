@@ -45,6 +45,8 @@ struct DailyGenerationService: Sendable {
                 try batch.save(root: paths.root, day: day)
                 do {
                     png = try await provider.generateImage(prompt: PortraitPrompt.convert(planned.prompt))
+                    // 解碼失敗不可重試：走同一段 catch 停住這一批，不再付費重打。
+                    guard ImageProcessing.pixelSize(of: png) != nil else { throw GenerationError.decoding }
                 } catch {
                     // 背景時間用完被系統中斷（取消）也算暫時性：這一批稍後續作，不會整天停住。
                     let retryable = DailyBatch.isRetryable(error) || DynamicAutoState.isCancellation(error)
@@ -53,7 +55,6 @@ struct DailyGenerationService: Sendable {
                     try batch.save(root: paths.root, day: day)
                     throw error
                 }
-                guard ImageProcessing.pixelSize(of: png) != nil else { throw GenerationError.decoding }
                 try ImageProcessing.write(png, to: nativeURL)
                 AppPaths.excludeFromBackup(paths.originals)
             }

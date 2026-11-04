@@ -188,8 +188,11 @@ struct GenerationService: Sendable {
                     batch!.retryAfter = Date().addingTimeInterval(300)
                     try batch!.save(root: outputRoot, day: day)
                 }
-                do { png = try await provider.generateImage(prompt: planned.prompt) }
-                catch {
+                do {
+                    png = try await provider.generateImage(prompt: planned.prompt)
+                    // 解碼失敗不可重試：走同一段 catch 停住這一批，不再付費重打。
+                    guard ImageResampler.pixelSize(of: png) != nil else { throw GenerationError.decoding }
+                } catch {
                     if let day = batchDay {
                         batch!.retryAfter = DailyBatch.isRetryable(error) && batch!.attempts[index] < 3
                             ? Date().addingTimeInterval(batch!.attempts[index] == 1 ? 60 : 300) : nil
