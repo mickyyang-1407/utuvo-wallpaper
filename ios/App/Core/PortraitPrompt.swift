@@ -2,7 +2,7 @@ import Foundation
 
 /// 共用的 `PromptTemplate.shared` 是橫式 16:9 桌面桌布；iPhone 送出前轉成直式。
 enum PortraitPrompt {
-    static let clockSentence = "vertical 9:16 iPhone wallpaper, keep the main subject in the middle and lower two thirds so the clock area at the top stays calm"
+    static let clockSentence = "vertical 9:16 iPhone wallpaper, leave the top fifth of the frame uncluttered for the lock-screen clock"
 
     private static let rules: [(pattern: String, replacement: String)] = [
         (#"vertical texture yet wide 16:9 framing"#, "vertical framing"),
@@ -23,6 +23,9 @@ enum PortraitPrompt {
                                              options: [.regularExpression, .caseInsensitive])
         }
         if text.hasSuffix(".") { text.removeLast() }
+        // 範本已寫過一次直式字樣時就地換成完整說明，不重複兩次。
+        let marker = "vertical 9:16 iPhone wallpaper"
+        if let range = text.range(of: marker) { return text.replacingCharacters(in: range, with: clockSentence) + "." }
         return text + ", " + clockSentence + "."
     }
 }

@@ -15,7 +15,7 @@ enum ScenePrompt {
         case .phone: frame = "vertical 9:16 iPhone wallpaper"
         }
         let phoneNote = canvas == .phone
-            ? "\nKeep the main subject in the middle and lower two thirds so the clock area at the top stays calm." : ""
+            ? "\nLeave the top fifth of the frame uncluttered for the lock-screen clock." : ""
         return """
         Create one \(frame) image of: \(scene).
         Follow the art style, medium and subject in that description exactly. It can be anything: \

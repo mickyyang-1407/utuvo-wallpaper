@@ -25,12 +25,13 @@ final class VarietyTests: XCTestCase {
         formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.dateFormat = "yyyy-MM-dd"
         let start = calendar.date(from: DateComponents(year: 2026, month: 11, day: 3))!
         for template in PromptTemplate.shared {
-            let picked = (0..<template.subjects.count).map { offset -> String in
+            let pool = DailyPlan.subjectPool(template)
+            let picked = (0..<pool.count).map { offset -> String in
                 let day = formatter.string(from: calendar.date(byAdding: .day, value: offset, to: start)!)
                 let prompt = DailyPlan.make(day: day, count: 1, recipe: DailyRecipe(styles: [template.id])).first!.prompt
-                return template.subjects.first { prompt.contains("Subject: \($0).") } ?? "?"
+                return pool.first { prompt.contains("Subject: \($0).") } ?? "?"
             }
-            XCTAssertEqual(Set(picked).count, template.subjects.count, template.id)
+            XCTAssertEqual(Set(picked).count, pool.count, template.id)
         }
     }
 
@@ -189,4 +190,43 @@ final class VarietyTests: XCTestCase {
 
 private extension DailyBatch {
     func with(_ change: (inout DailyBatch) -> Void) -> DailyBatch { var copy = self; change(&copy); return copy }
+}
+
+final class WiderPromptTests: XCTestCase {
+    /// 只選一個分類一次產 10 張：10 個主題都不同，而且一半左右帶氣氛細節。
+    func testOneCategoryTenImagesAllDiffer() {
+        for category in ["動物", "城市", "動畫", "抽象"] {
+            var recipe = DailyRecipe()
+            recipe.setCategory(category, on: true)
+            let plan = DailyPlan.make(day: "2026-11-04", count: 10, recipe: recipe, salt: "manual-1")
+            let subjects = plan.map { $0.prompt.components(separatedBy: "Subject: ")[1].components(separatedBy: ". ")[0] }
+            XCTAssertEqual(Set(subjects).count, 10, "\(category): \(subjects)")
+            XCTAssertGreaterThanOrEqual(Set(plan.map(\.prompt)).count, 10)
+        }
+        let pool = DailyPlan.subjectPool(PromptTemplate.shared.first { $0.id == "animals" }!)
+        XCTAssertGreaterThanOrEqual(pool.count, 25)
+    }
+
+    func testPortraitSaysVerticalOnceAndDoesNotPinTheSubject() {
+        let plan = DailyPlan.make(day: "2026-11-04", count: 10, recipe: DailyRecipe())
+        for planned in plan {
+            let out = PortraitPrompt.convert(planned.prompt)
+            XCTAssertEqual(out.components(separatedBy: "vertical 9:16 iPhone wallpaper").count - 1, 1, out)
+            XCTAssertFalse(out.contains("lower two thirds"), out)
+            XCTAssertTrue(out.contains(PortraitPrompt.clockSentence), out)
+        }
+    }
+}
+
+final class MixedStyleTests: XCTestCase {
+    func testContentCategoriesMixArtStylesButStyleCategoriesKeepTheirOwn() {
+        var animals = DailyRecipe(); animals.setCategory("動物", on: true)
+        let plan = DailyPlan.make(day: "2026-11-04", count: 10, recipe: animals, salt: "s")
+        let mixed = plan.filter { $0.prompt.hasPrefix("Art style: ") }.count
+        XCTAssertTrue((2...8).contains(mixed), "mixed \(mixed)/10")
+        var watercolor = DailyRecipe(); watercolor.setCategory("水彩", on: true)
+        XCTAssertTrue(DailyPlan.make(day: "2026-11-04", count: 10, recipe: watercolor, salt: "s").allSatisfy { !$0.prompt.hasPrefix("Art style: ") })
+        var withIdea = animals; withIdea.idea = "吉卜力風格的貓"
+        XCTAssertTrue(DailyPlan.make(day: "2026-11-04", count: 10, recipe: withIdea, salt: "s").allSatisfy { !$0.prompt.hasPrefix("Art style: ") })
+    }
 }

@@ -17,8 +17,7 @@ final class PortraitPromptTests: XCTestCase {
 
     func testBareRatioAndDesktopWording() {
         let out = PortraitPrompt.convert("Calm sea, wide 16:9 desktop wallpaper composition, no text.")
-        XCTAssertTrue(out.hasPrefix("Calm sea, vertical 9:16 iPhone wallpaper composition, no text, "))
-        XCTAssertTrue(out.hasSuffix("stays calm."))
+        XCTAssertEqual(out, "Calm sea, \(PortraitPrompt.clockSentence) composition, no text.")
         XCTAssertEqual(PortraitPrompt.convert("art, 16:9").contains("9:16"), true)
     }
 

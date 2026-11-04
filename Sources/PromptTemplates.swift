@@ -26,11 +26,14 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
     /// 預設組合（第一個主題、第一組配色）。
     var prompt: String { compose(subject: subjects[0], palette: palettes[0], light: nil, composition: nil) }
 
-    func compose(subject: String, palette: String, light: String?, composition: String?) -> String {
+    func compose(subject: String, palette: String, light: String?, composition: String?, detail: String? = nil,
+                 artStyle: String? = nil) -> String {
         if let local { return LocalArt.prefix + local + ":" + palette }
-        var parts = [style, "Subject: \(subject)", "Palette: \(palette)"]
+        let lead = artStyle.map { "Art style: \($0), rich detail, calm mood" } ?? style
+        var parts = [lead, "Subject: \(subject)", "Palette: \(palette)"]
         if let light, representational { parts.append(light) }
         if let composition { parts.append(composition) }
+        if let detail { parts.append(detail) }
         parts.append("wide 16:9 desktop wallpaper, no text, no watermark, no logos")
         return parts.joined(separator: ". ") + "."
     }
@@ -38,11 +41,16 @@ struct PromptTemplate: Identifiable, Hashable, Sendable {
     static let lights = [
         "soft early morning light", "clear midday light", "warm late afternoon light",
         "golden hour backlight", "overcast diffused light", "blue hour after sunset",
+        "misty morning haze", "dramatic light breaking through clouds", "soft light after rain",
+        "dappled light through leaves", "moonlight with a few warm lamps", "bright crisp winter light",
     ]
     static let compositions = [
         "wide open composition with generous negative space", "low horizon with a large sky",
         "subject placed off-center on the right third", "subject placed off-center on the left third",
         "layered foreground, middle ground and distance", "calm symmetrical composition",
+        "seen from a low angle looking up", "seen from above, looking down",
+        "close-up with a softly blurred background", "framed through a window or archway",
+        "a small subject in a vast space", "a gentle diagonal leading the eye through the frame",
     ]
 
     static let shared: [PromptTemplate] = [
@@ -576,15 +584,35 @@ enum DailyPlan {
             let base = Int(DynamicAutoPlanner.stableHash(template.id) % 1000)
             func pick<T>(_ list: [T], stride: Int) -> T { list[(base + dayNumber * stride + round) % list.count] }
             // 純色、漸層是本機畫的，不吃自己的 Prompt。
-            let subject = idea.isEmpty || template.local != nil ? pick(template.subjects, stride: 1) : idea
-            // 自己的想法：主題固定，靠配色、光線、構圖做出差異（同一天多張也各不同）。
+            let subject = idea.isEmpty || template.local != nil ? pick(subjectPool(template), stride: 1) : idea
+            // 自己的想法：主題固定，靠配色、光線、構圖、氣氛做出差異（同一天多張也各不同）。
             let palette = pick(template.palettes, stride: 1)
             let light = pick(PromptTemplate.lights, stride: 5)
-            let composition = pick(PromptTemplate.compositions, stride: 1 + (idea.isEmpty ? 0 : 1))
+            let composition = pick(PromptTemplate.compositions, stride: idea.isEmpty ? 1 : 7)
+            // 約一半的圖再加一句 AI 靈感的氣氛／構圖細節。
+            let roll = Int(DynamicAutoPlanner.stableHash("\(day)#\(salt)#\(index)") % 1_000_000)
+            let slot = roll % (PromptInspiration.details.count * 2)
+            let detail = slot < PromptInspiration.details.count ? PromptInspiration.details[slot].en : nil
+            // 內容型分類（自然風景、建築、城市、動物）約一半換畫風，不要每張都是攝影；自己寫想法時照想法走。
+            let styleRoll = Int(DynamicAutoPlanner.stableHash("style#\(day)#\(salt)#\(index)") % 1_000_000)
+            let artStyle = idea.isEmpty && mixedStyleTemplates.contains(template.id) && styleRoll % 2 == 1
+                ? DynamicAutoPlanner.styles[(styleRoll / 2) % DynamicAutoPlanner.styles.count].en : nil
             let slug = round == 0 ? template.id : "\(template.id)-\(round + 1)"
             return PlannedPrompt(templateID: template.id, slug: slug,
-                                 prompt: template.compose(subject: subject, palette: palette, light: light, composition: composition))
+                                 prompt: template.compose(subject: subject, palette: palette, light: light,
+                                                          composition: composition, detail: detail, artStyle: artStyle))
         }
+    }
+
+    /// 分類講的是「畫什麼」而不是「怎麼畫」的風格，可以換畫風。
+    static let mixedStyleTemplates: Set<String> = ["nature-dawn", "architecture-arcade", "city", "animals"]
+
+    /// 每個風格可畫的主題：風格自己的＋同分類的 AI 靈感（英文），去重後依序輪替。
+    static func subjectPool(_ template: PromptTemplate) -> [String] {
+        guard template.local == nil else { return template.subjects }
+        var seen = Set<String>()
+        return (template.subjects + (PromptInspiration.ideas[template.category]?.map(\.en) ?? []))
+            .filter { seen.insert($0).inserted }
     }
 
     /// "yyyy-MM-dd" → 從 2000-01-01 起第幾天；看不懂就用雜湊。

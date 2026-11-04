@@ -39,15 +39,16 @@ extension SelfTest {
         let fmt = DateFormatter()
         fmt.calendar = cal0; fmt.timeZone = cal0.timeZone; fmt.dateFormat = "yyyy-MM-dd"
         for template in PromptTemplate.shared {
-            let subjects = (0..<template.subjects.count).map { offset -> String in
+            let pool = DailyPlan.subjectPool(template)
+            let subjects = (0..<pool.count).map { offset -> String in
                 let day = fmt.string(from: cal0.date(byAdding: .day, value: offset, to: start0)!)
                 let prompt = DailyPlan.make(day: day, count: 1, recipe: DailyRecipe(styles: [template.id])).first!.prompt
-                return template.subjects.first { prompt.contains("Subject: \($0).") } ?? "?"
+                return pool.first { prompt.contains("Subject: \($0).") } ?? "?"
             }
-            if Set(subjects).count != template.subjects.count { cycleOK = false }
+            if Set(subjects).count != pool.count { cycleOK = false }
         }
         record("每日 10 張：每個風格把主題輪完一圈才重複（隔天一定換主題）", cycleOK,
-               "風格 \(PromptTemplate.shared.count) 種、主題 \(PromptTemplate.shared.map(\.subjects.count).reduce(0, +)) 個")
+               "風格 \(PromptTemplate.shared.count) 種、主題 \(PromptTemplate.shared.map { DailyPlan.subjectPool($0).count }.reduce(0, +)) 個")
 
         let picked = DailyRecipe(styles: ["watercolor-meadow", "cosmic-nebula"], idea: "")
         let pickedPlan = DailyPlan.make(day: "2026-11-02", count: 10, recipe: picked)
