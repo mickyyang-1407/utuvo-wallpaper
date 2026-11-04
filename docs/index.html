@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UTUVO Wallpaper — 每天十張新桌布</title>
-<meta name="description" content="Open-source wallpaper app for Mac and iPhone: ten fresh AI wallpapers a day in fifteen categories, day-to-night scenes, free solid colors and gradients, and a Liquid Glass interface. Uses your own OpenAI API key.">
+<meta name="description" content="Open-source wallpaper app for Mac, iPhone and Android: ten fresh AI wallpapers a day in fifteen categories, day-to-night scenes, free solid colors and gradients, and a Liquid Glass interface. Uses your own OpenAI API key.">
 <meta property="og:title" content="UTUVO Wallpaper">
-<meta property="og:description" content="每天十張新桌布，Mac 和 iPhone 都有。Ten fresh wallpapers a day, on Mac and iPhone. Open source.">
+<meta property="og:description" content="每天十張新桌布，Mac、iPhone和Android都有。Ten fresh wallpapers a day, on Mac, iPhone and Android. Open source.">
 <meta property="og:image" content="https://mickyyang-1407.github.io/utuvo-wallpaper/assets/hero-en.jpg">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -63,6 +63,7 @@
   .btn.primary{background:var(--ink);color:var(--btn-ink)}
   .btn:hover{transform:translateY(-1px)}
   .note{font-size:14px;color:var(--ink-3);margin-top:18px}
+  .note.note2{margin-top:4px}
   .shot{margin:48px auto 0;max-width:1240px;padding:0 28px}
   .shot img{display:block;width:100%;height:auto;border-radius:16px;
             box-shadow:0 1px 0 rgba(0,0,0,.04),0 30px 60px -36px rgba(0,0,0,.45)}
@@ -136,6 +137,7 @@
     <div class="links">
       <a href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
       <a href="#iphone">iPhone</a>
+      <a href="#android">Android</a>
       <a href="#key"><span class="zh">API key</span><span class="en">API key</span></a>
       <a href="#source"><span class="zh">原始碼</span><span class="en">Source</span></a>
     </div>
@@ -146,14 +148,16 @@
 
 <header class="hero">
   <div class="wrap">
-    <div class="label"><span class="zh">開源 · Mac ＋ iPhone</span><span class="en">Open source · Mac + iPhone</span></div>
+    <div class="label"><span class="zh">開源 · Mac ＋ iPhone ＋ Android</span><span class="en">Open source · Mac + iPhone + Android</span></div>
     <h1><span class="zh">每天十張新桌布，<br>不會重複。</span><span class="en">Ten new wallpapers a day.<br>Never the same twice.</span></h1>
     <p class="lead"><span class="zh">UTUVO Wallpaper 用你自己的 OpenAI API key，每天畫出十張不同主題、光線和構圖的桌布，自動分進 15 個分類、輪播到每一個螢幕；還能把同一個場景做成會跟著時間從早到晚變化的桌布。</span><span class="en">UTUVO Wallpaper uses your own OpenAI API key to paint ten wallpapers a day — new subjects, light and composition each time — sorts them into 15 categories, rotates them across every display, and turns one scene into a wallpaper that follows the day from dawn to night.</span></p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest"><span class="zh">下載 macOS 版</span><span class="en">Download for macOS</span></a>
+      <a class="btn primary" href="https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest"><span class="zh">下載macOS版</span><span class="en">Download for macOS</span></a>
+      <a class="btn" href="https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0"><span class="zh">下載Android版</span><span class="en">Download for Android</span></a>
       <a class="btn" href="https://github.com/mickyyang-1407/utuvo-wallpaper"><span class="zh">看原始碼</span><span class="en">View the source</span></a>
     </div>
     <p class="note"><span class="zh">macOS 14 以上 · Apple silicon 與 Intel · Developer ID 簽章、Apple 公證 · MIT 授權</span><span class="en">macOS 14 or later · Apple silicon and Intel · Developer ID signed and notarized · MIT</span></p>
+    <p class="note note2"><span class="zh">Android 10以上 · APK直接安裝，沒有上Google Play</span><span class="en">Android 10 or later · install the APK directly, not on Google Play</span></p>
   </div>
   <div class="shot">
     <img class="zh" src="assets/hero-zh.jpg" width="2800" height="1640" alt="UTUVO Wallpaper 的 Mac 視窗與 iPhone 畫面">
@@ -277,12 +281,33 @@
   </div>
 </section>
 
+<section id="android">
+  <div class="wrap">
+    <div class="feature">
+      <div class="text">
+        <div class="label">Android</div>
+        <h2><span class="zh">Android會自己換桌布</span><span class="en">On Android, it changes the wallpaper itself</span></h2>
+        <ul>
+          <li><span class="zh">同樣的提示詞、分類、收藏和日夜場景，跟Mac、iPhone一字不差。Android 10以上。</span><span class="en">The same prompts, categories, favorites and day-and-night scenes as on Mac and iPhone, word for word. Android 10 or later.</span></li>
+          <li><span class="zh">Android讓App直接換桌布，不用捷徑：日夜到點自己換，也能每15分鐘以上輪換一次。</span><span class="en">Android lets the app set the wallpaper directly, no shortcut needed: Day &amp; Night switches on time, and rotation can run as often as every 15 minutes.</span></li>
+          <li><span class="zh">產生到一半被系統關掉也不會重付：做好的保留、從斷掉的地方接著做。</span><span class="en">If the system stops the app mid-batch, nothing is paid for twice: finished pictures are kept and the batch picks up where it stopped.</span></li>
+          <li><span class="zh"><a href="https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0">在GitHub下載APK</a>，原始碼在<code>android/</code>。</span><span class="en"><a href="https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0">Download the APK on GitHub</a>; the source is in <code>android/</code>.</span></li>
+        </ul>
+      </div>
+      <figure>
+        <img class="zh" src="assets/android-zh.png" width="1034" height="700" alt="Android版的圖庫、日夜和設定畫面" loading="lazy">
+        <img class="en" src="assets/android-en.png" width="1034" height="700" alt="The Android app: library, Day &amp; Night and settings" loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
 <section id="key">
   <div class="wrap">
     <div class="label"><span class="zh">你的 key、你的資料</span><span class="en">Your key, your data</span></div>
     <h2><span class="zh">用你自己的 OpenAI API key</span><span class="en">Bring your own OpenAI API key</span></h2>
     <p class="sub"><span class="zh">畫圖走 OpenAI Images API（<code>gpt-image-2</code>），費用算在你自己的 OpenAI 帳號。一張圖一次請求；一組日夜場景是一次產生加三次修改。沒有 key 也能看內建的示範圖、用純色和漸層。</span><span class="en">Pictures come from the OpenAI Images API (<code>gpt-image-2</code>), billed to your own OpenAI account. One picture is one request; a day-and-night scene is one generation plus three edits. Without a key you can still browse the demo pictures and use solid colors and gradients.</span></p>
-    <details><summary><span class="zh">key 存在哪裡？</span><span class="en">Where is the key kept?</span></summary><p><span class="zh">存在 Mac 的鑰匙圈，只放在記憶體裡用，不寫進記錄、狀態檔、錯誤訊息或圖片資訊。鑰匙圈鎖住時 App 會停下來，不會改去別處找。</span><span class="en">In the Mac Keychain, and only held in memory while used. It never goes into logs, status files, error messages or picture metadata. If the Keychain is locked, the app stops instead of looking elsewhere.</span></p></details>
+    <details><summary><span class="zh">key 存在哪裡？</span><span class="en">Where is the key kept?</span></summary><p><span class="zh">存在 Mac 的鑰匙圈，只放在記憶體裡用，不寫進記錄、狀態檔、錯誤訊息或圖片資訊。鑰匙圈鎖住時 App 會停下來，不會改去別處找。iPhone版存在這支iPhone的鑰匙圈；Android版用Android Keystore加密存在手機上。</span><span class="en">In the Mac Keychain, and only held in memory while used. It never goes into logs, status files, error messages or picture metadata. If the Keychain is locked, the app stops instead of looking elsewhere. On iPhone it stays in that iPhone's Keychain; on Android it is encrypted with the Android Keystore on the phone.</span></p></details>
     <details><summary><span class="zh">會不會一直花錢？</span><span class="en">Will it keep spending?</span></summary><p><span class="zh">每天最多一批十張。網路斷掉時只補缺的，每個主題最多重試三次。純色和漸層完全不呼叫 API。</span><span class="en">At most one batch of ten a day. If a connection drops it only fills the gaps, with at most three tries per theme. Solid colors and gradients never call the API.</span></p></details>
     <details><summary><span class="zh">圖放在哪？</span><span class="en">Where do the pictures go?</span></summary><p><span class="zh"><code>~/Library/Application Support/UTUVO Wallpaper</code>，一天約 130 MB（原圖加 6K 版本），不會自動刪。6K 版本是 Core Graphics 重新取樣，不是 AI 放大。</span><span class="en"><code>~/Library/Application Support/UTUVO Wallpaper</code>, about 130 MB a day (originals plus 6K versions), never deleted automatically. The 6K version is Core Graphics resampling, not AI upscaling.</span></p></details>
   </div>

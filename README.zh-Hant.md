@@ -2,7 +2,7 @@
 
 小巧的 macOS 原生桌布 App，整個介面是 Liquid Glass。用你自己的 OpenAI API key，每天生成 10 張新桌布：每天換主題、配色、光線與構圖，可以選分類，也可以寫自己的 Prompt；15 個分類自動整理，在所有螢幕上輪換，還能把一個場景做成跟著時間從清晨變到夜晚的日夜桌布。純色與漸層直接在你的 Mac 上畫，不需要 API key。
 
-[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest) · [English](README.md)
+[下載 macOS 版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest) · [下載Android版](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0) · [English](README.md)
 
 macOS 14 以上 · Apple Silicon 與 Intel · English／繁體中文 · MIT
 
@@ -68,6 +68,10 @@ open UTUVOWallpaper.xcodeproj
 ```
 
 ## Android 版
+
+<img src="docs/assets/android-zh.png" alt="UTUVO Wallpaper Android版" width="620">
+
+[下載APK](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0)，在手機上打開安裝（Android問要不要允許從瀏覽器或檔案App安裝時，按允許）。沒有上Google Play。
 
 `android/` 資料夾是 Android 版（Android 10 以上）：同樣的風格、分類、收藏、AI 靈感與日夜桌布，大圖可以左右滑換張。
 

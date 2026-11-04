@@ -2,7 +2,7 @@
 
 A small native macOS wallpaper app with a Liquid Glass interface. It generates ten fresh wallpapers every day with your own OpenAI API key — new subjects, colors, light and composition each day, in the categories you pick or from your own prompt — sorts them into fifteen categories, rotates them across all your displays, and turns one scene into a day-to-night wallpaper that follows the time of day. Solid colors and gradients are drawn right on your Mac, no API key needed.
 
-[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest) · [繁體中文](README.zh-Hant.md)
+[Download for macOS](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/latest) · [Download for Android](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0) · [繁體中文](README.zh-Hant.md)
 
 macOS 14 or later · Apple silicon and Intel · English and 繁體中文 · MIT
 
@@ -68,6 +68,10 @@ open UTUVOWallpaper.xcodeproj
 ```
 
 ## Android
+
+<img src="docs/assets/android-en.png" alt="UTUVO Wallpaper on Android" width="620">
+
+[Download the APK](https://github.com/mickyyang-1407/utuvo-wallpaper/releases/tag/android-v0.1.0) and open it on your phone (allow installing from your browser or file app when Android asks). It is not on Google Play.
 
 The `android/` folder holds the Android version (Android 10 or later). It has the same styles, categories, favorites, AI Idea and day-and-night scenes, and swipes left and right through the full-size view.
 
