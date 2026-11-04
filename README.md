@@ -67,6 +67,20 @@ cd ios && xcodegen generate
 open UTUVOWallpaper.xcodeproj
 ```
 
+## Android
+
+The `android/` folder holds the Android version (Android 10 or later). It has the same styles, categories, favorites, AI Idea and day-and-night scenes, and swipes left and right through the full-size view.
+
+Android lets apps change the wallpaper directly, so there is nothing to set up: tap **Set as Wallpaper** and the home and lock screens change. After that, rotation and day and night switch by themselves in the background (at most every 15 minutes; a day-and-night change can be a few minutes late because the app does not ask for exact alarms). Schedules survive a reboot. If you force-stop the app in Android settings, Android clears its schedules until you open it again.
+
+Your API key is encrypted with the Android Keystore and never shown again after you save it.
+
+To build it you need JDK 21 and the Android SDK:
+
+```sh
+cd android && ./gradlew assembleRelease
+```
+
 ## Your API key
 
 Generating pictures uses the OpenAI Images API (`gpt-image-2`) and is billed to **your** OpenAI account. Each picture is one request; a day-and-night scene is one generation plus three edits. Without a key you can still browse the bundled demo pictures.

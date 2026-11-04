@@ -229,20 +229,36 @@ class DailyGenerationService(
         return results
     }
 
-    /** 手動「立即產生」：每次加隨機 salt 換一組主題；每完成一張立刻寫檔，中途失敗已完成的保留。 */
+    /**
+     * 手動「立即產生」：每次加隨機 salt 換一組主題；每完成一張立刻寫檔，中途失敗已完成的保留。
+     * [runID] 有給時（背景工作 id）：salt 固定用它、檔名可預測（`<slug>-<runID>-<第幾張>`），
+     * 重跑時該張檔案已存在就直接沿用、不再呼叫 provider——續作以檔案為準，不會重付。
+     */
     fun runManual(day: String, count: Int, salt: String = java.util.UUID.randomUUID().toString().uppercase(),
-                  progress: (Int, Int) -> Unit = { _, _ -> }): List<GeneratedWallpaper> {
+                  progress: (Int, Int) -> Unit = { _, _ -> }, runID: String? = null): List<GeneratedWallpaper> {
         if (count <= 0) throw GenerationError.EmptyPrompt
         paths.prepare()
-        val plan = DailyPlan.make(data, day, count, recipe, salt)
+        val plan = DailyPlan.make(data, day, count, recipe, runID ?: salt)
         val results = mutableListOf<GeneratedWallpaper>()
         progress(0, count)
-        for (planned in plan) {
-            if (isCancelled()) throw GenerationError.Cancelled
-            val id = RandomID.make()
+        for ((index, planned) in plan.withIndex()) {
+            val id = if (runID != null) "$runID-${index + 1}" else RandomID.make()
             val native = File(paths.originals, "${planned.slug}-$id.png")
             val wallpaper = File(paths.wallpapers, "${planned.slug}-$id.jpg")
-            val png = if (LocalArt.isLocal(planned.prompt)) {
+            if (runID != null && native.isFile && wallpaper.isFile) {
+                // 上次（被系統中斷前）已做完這張：沿用，不重付。
+                val size = codec.pixelSize(native.readBytes())
+                if (size != null) {
+                    results += GeneratedWallpaper(titleOf(planned), native.name, CropMath.label(size.first, size.second),
+                        wallpaper.name, CropMath.label(targetW, targetH), "resampled")
+                    progress(results.size, count)
+                    continue
+                }
+            }
+            if (isCancelled()) throw GenerationError.Cancelled
+            val png = if (runID != null && native.isFile && codec.pixelSize(native.readBytes()) != null) {
+                native.readBytes() // 原生圖已存、裝置尺寸還沒裁：重裁就好。
+            } else if (LocalArt.isLocal(planned.prompt)) {
                 codec.encodePng(LocalArt.render(planned.prompt, targetW, targetH) ?: throw GenerationError.Decoding)
             } else {
                 provider.generateImage(PortraitPrompt.convert(planned.prompt))

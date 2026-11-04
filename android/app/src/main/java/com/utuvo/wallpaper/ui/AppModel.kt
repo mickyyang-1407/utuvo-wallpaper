@@ -173,7 +173,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         Jobs.finished.value = null
         reload()
         r.onSuccess { (kind, n) -> if (kind == "manual") message = ctx.getString(R.string.done_n, n) }
-            .onFailure { e -> if (!RetryPolicy.isCancellation(e)) message = Strings.error(ctx, e) }
+            .onFailure { e -> message = if (RetryPolicy.isCancellation(e)) ctx.getString(R.string.err_cancelled) else Strings.error(ctx, e) }
     }
 
     fun runDailyIfNeeded() {

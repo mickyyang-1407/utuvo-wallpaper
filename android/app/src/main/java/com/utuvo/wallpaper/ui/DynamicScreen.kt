@@ -127,6 +127,7 @@ fun DynamicScreen(model: AppModel) {
             if (r != null && r.kind == "scene") {
                 Text(stringResource(R.string.scene_progress, r.done))
                 LinearProgressIndicator({ r.done / 4f }, Modifier.fillMaxWidth(), color = Palette.accent)
+                androidx.compose.material3.TextButton({ Jobs.cancelGenerate(ctx) }) { Text(stringResource(R.string.cancel), color = Palette.red) }
             } else if (auto == DynamicAutoFrequency.OFF) {
                 OutlinedTextField(scene, { scene = it }, Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.scene_example)) })
                 Spacer(Modifier.height(8.dp))

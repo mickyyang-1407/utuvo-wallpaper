@@ -9,6 +9,11 @@ import kotlinx.coroutines.launch
 class WallpaperApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        Jobs.scope.launch { Scheduler.sync(this@WallpaperApp) }
+        Jobs.scope.launch {
+            Scheduler.sync(this@WallpaperApp)
+            // 等 WorkManager 自己整理完排程，再檢查有沒有卡住的產生工作。
+            kotlinx.coroutines.delay(10_000)
+            com.utuvo.wallpaper.platform.GenerateWorker.kick(this@WallpaperApp)
+        }
     }
 }

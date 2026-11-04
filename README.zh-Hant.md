@@ -67,6 +67,20 @@ cd ios && xcodegen generate
 open UTUVOWallpaper.xcodeproj
 ```
 
+## Android 版
+
+`android/` 資料夾是 Android 版（Android 10 以上）：同樣的風格、分類、收藏、AI 靈感與日夜桌布，大圖可以左右滑換張。
+
+Android 允許 App 直接換桌布，不用另外設定：按**設為桌布**，主畫面和鎖定畫面就會換。之後輪換與日夜會在背景自動切換（最短每 15 分鐘；日夜到點可能晚幾分鐘，因為 App 不要求精確鬧鐘權限）。重開機後排程仍在；如果在 Android 設定裡「強制停止」App，系統會清掉排程，直到你再打開 App。
+
+API key 用 Android Keystore 加密保存，存好後不會再顯示。
+
+編譯需要 JDK 21 與 Android SDK：
+
+```sh
+cd android && ./gradlew assembleRelease
+```
+
 ## API key
 
 生圖使用 OpenAI Images API（`gpt-image-2`），費用由**你自己的** OpenAI 帳號支付。每張圖一次請求；一組日夜桌布是一次生成加三次編修。沒有 key 也能瀏覽內附的示範圖。

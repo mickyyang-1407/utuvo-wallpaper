@@ -72,7 +72,14 @@ fun GenerateSheet(model: AppModel, dismiss: () -> Unit) {
                 Text(stringResource(R.string.generating_progress, r.done, r.total), color = Palette.secondary, fontSize = 13.sp)
                 Text(stringResource(R.string.can_close), color = Palette.secondary, fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
-                TextButton(dismiss) { Text(stringResource(R.string.close)) }
+                Row {
+                    if (r.kind != "daily") {
+                        TextButton({ Jobs.cancelGenerate(ctx) }, Modifier.testTag("cancel-generate")) {
+                            Text(stringResource(R.string.cancel), color = Palette.red)
+                        }
+                    }
+                    TextButton(dismiss) { Text(stringResource(R.string.close)) }
+                }
                 Spacer(Modifier.height(24.dp))
                 return@Column
             }

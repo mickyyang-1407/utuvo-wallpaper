@@ -208,27 +208,34 @@ object Jobs {
 
     fun isBusy() = busy.get()
 
-    fun daily(context: Context, env: AppEnv = AppEnv.get(context), recipe: DailyRecipe = env.prefs.recipe(env.data)) =
+    fun daily(context: Context, env: AppEnv = AppEnv.get(context), recipe: DailyRecipe = env.prefs.recipe(env.data),
+              isCancelled: () -> Boolean = { false }) =
         DailyGenerationService(env.data, Providers.make(context), env.paths, BitmapCodec,
             DeviceScreen.nativePixels(context).first, DeviceScreen.nativePixels(context).second, recipe,
-            nowMs = { AppClock.nowMs(context) })
+            nowMs = { AppClock.nowMs(context) }, isCancelled = isCancelled)
+
+    /** 取消正在跑或排隊的產生工作（手動、場景、AI 一組）。 */
+    fun cancelGenerate(context: Context) {
+        GenerateWorker.cancelRequested = true
+        GenerateWorker.clearPending(context)
+        WorkManager.getInstance(context).cancelUniqueWork(GenerateWorker.UNIQUE)
+    }
 
     /** 手動產生：交給 WorkManager（切到背景、行程被回收都會跑完或續作）。 */
     fun launchManual(context: Context, count: Int, recipe: DailyRecipe): Boolean =
         GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "manual", GenerateWorker.COUNT to count,
-            GenerateWorker.STYLES to recipe.styles.toTypedArray(), GenerateWorker.IDEA to recipe.idea))
+            GenerateWorker.STYLES to recipe.styles.toTypedArray(), GenerateWorker.IDEA to recipe.idea,
+            GenerateWorker.DAY to AppPaths.dayString(AppClock.now(context))))
 
-    /** 手動產生的實際工作；[alreadyDone] 是上次被中斷前已完成的張數（續作只補剩下的）。 */
-    fun runManual(context: Context, count: Int, recipe: DailyRecipe, alreadyDone: Int, saveDone: (Int) -> Unit): Result<Int>? {
+    /**
+     * 手動產生的實際工作。[runID]＝背景工作 id 前 8 碼：檔名可預測，重跑時已存在的那幾張直接沿用（不重付）。
+     * [day] 也要固定（跨午夜重跑時主題計畫不變）。
+     */
+    fun runManual(context: Context, count: Int, recipe: DailyRecipe, runID: String, day: String,
+                  isCancelled: () -> Boolean, progress: (Int) -> Unit): Result<Int>? {
         val env = AppEnv.get(context)
-        val day = AppPaths.dayString(AppClock.now(context))
-        val left = count - alreadyDone
-        if (left <= 0) return Result.success(count)
         return exclusive("manual", count) { p ->
-            p(alreadyDone, count)
-            daily(context, env, recipe).runManual(day, left, progress = { d, _ ->
-                saveDone(alreadyDone + d); p(alreadyDone + d, count)
-            }).size + alreadyDone
+            daily(context, env, recipe, isCancelled).runManual(day, count, progress = { d, t -> progress(d); p(d, t) }, runID = runID).size
         }
     }
 
@@ -241,10 +248,10 @@ object Jobs {
     }
 
     /** 日夜場景生成（同 id 續作不重付）。完成後只把場景設成新的（跟 iPhone 一樣不自動開日夜）。 */
-    fun runScene(context: Context, prompt: String, id: String? = null): Result<String>? {
+    fun runScene(context: Context, prompt: String, id: String? = null, isCancelled: () -> Boolean = { false }): Result<String>? {
         val env = AppEnv.get(context)
         val (w, h) = DeviceScreen.nativePixels(context)
-        val svc = SceneGenerationService(Providers.make(context), env.paths, BitmapCodec, w, h)
+        val svc = SceneGenerationService(Providers.make(context), env.paths, BitmapCodec, w, h, isCancelled)
         return exclusive("scene", 4) { p ->
             val step: (Int) -> Unit = { Log.i(TAG, "scene progress: $it/4"); p(it, 4) }
             val rec = if (id != null) svc.generate(prompt, id, step) else svc.generate(prompt, progress = step)
@@ -263,7 +270,7 @@ object Jobs {
         GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "auto"))
 
     /** 日夜 AI 自動：到期就生成一組，失敗記重試。manual＝使用者按「現在用 AI 生成一組」。 */
-    fun runDynamicAuto(context: Context, manual: Boolean): Result<String>? {
+    fun runDynamicAuto(context: Context, manual: Boolean, isCancelled: () -> Boolean = { false }): Result<String>? {
         val env = AppEnv.get(context)
         val freq = env.prefs.dynamicAutoFrequency
         val now = AppClock.now(context)
@@ -273,12 +280,14 @@ object Jobs {
         else DynamicAutoPlanner.due(env.data, prev, now, freq, chinese = chinese) ?: return null
         val counted = state.copy(attempts = state.attempts + 1)
         AutoStateFile.write(env.paths, counted)
-        val r = runScene(context, state.prompt, state.sceneID) ?: return null
+        val r = runScene(context, state.prompt, state.sceneID, isCancelled) ?: return null
         r.onSuccess {
             AutoStateFile.write(env.paths, counted.recordSuccess())
             Wallpapers.sceneReady(context)
         }.onFailure { e ->
-            AutoStateFile.write(env.paths, counted.recordFailure(RetryPolicy.isRetryable(e), AppClock.nowMs(context)))
+            // 使用者取消不算失敗（不耗掉這一期的自動重試額度）。
+            if (!RetryPolicy.isCancellation(e))
+                AutoStateFile.write(env.paths, counted.recordFailure(RetryPolicy.isRetryable(e), AppClock.nowMs(context)))
         }
         return r
     }
@@ -394,6 +403,7 @@ class RotationWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         Wallpapers.refresh(applicationContext)
         Scheduler.armPhaseAlarm(applicationContext)
+        GenerateWorker.kick(applicationContext)
         return Result.success()
     }
 }
@@ -405,6 +415,11 @@ class DailyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val env = AppEnv.get(ctx)
         if (env.prefs.dailyEnabled || DebugHooks.forceDaily(ctx)) {
             val r = Jobs.runDaily(ctx)
+            if (r == null && DailyGenerationService.hasWork(env.paths, AppPaths.dayString(AppClock.now(ctx)), AppClock.nowMs(ctx))) {
+                // 別的產生正在跑：稍後重試，不要把今天這批延到下一輪定期工作。
+                Log.i(TAG, "daily batch busy, retry later")
+                return Result.retry()
+            }
             r?.onFailure {
                 // GenerationError 只記種類；其他程式錯誤記堆疊（不含提示詞、key）。
                 if (it is GenerationError) Log.w(TAG, "daily batch stopped: ${it.kind}") else Log.w(TAG, "daily batch crashed", it)

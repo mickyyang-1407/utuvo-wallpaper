@@ -46,8 +46,11 @@ object DebugHooks {
 object FakeProvider : ImageProvider {
     /** 每張假裝花多久（Debug 廣播 fakeDelay 可調慢，用來測中途被系統殺掉）。 */
     @Volatile var delayMs = 150L
+    /** 送出的假請求數（log 用，證明取消後沒有再送）。 */
+    val requests = java.util.concurrent.atomic.AtomicInteger()
     override fun generateImage(prompt: String): ByteArray {
         val p = OpenAIImageProvider.validatePrompt(prompt)
+        Log.i("UTUVOWallpaper", "fake request: generate #" + requests.incrementAndGet())
         Thread.sleep(delayMs)
         val h = StableHash.of(p)
         val c1 = Color.HSVToColor(floatArrayOf((h % 360u).toFloat(), 0.55f, 0.85f))

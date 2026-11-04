@@ -176,6 +176,37 @@ class BatchTest {
         assertFalse(java.io.File(dir, ".daily-x.json.tmp").exists())
     }
 
+    @Test fun manualResumeReusesExistingFilesWithoutRepaying() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val png = TestSupport.png(4, 8)
+        // 第一次：前 3 張完成，第 4 張時被中斷（例如行程被殺）。
+        val first = ScriptedProvider(png, png, png, GenerationError.Cancelled)
+        try { service(first, paths, aiOnly).runManual(day, 5, runID = "abcd1234"); fail() } catch (e: GenerationError.Cancelled) { }
+        assertEquals(4, first.prompts.size)
+        assertEquals(3, paths.wallpapers.listFiles()!!.count { it.name.contains("-abcd1234-") })
+        // 重跑同一個工作：第 1–3 張檔案已存在，只請求剩下的 2 張。
+        val second = ScriptedProvider(png, png)
+        val results = service(second, paths, aiOnly).runManual(day, 5, runID = "abcd1234")
+        assertEquals(5, results.size)
+        assertEquals(2, second.prompts.size)
+        assertEquals(first.prompts.drop(3).take(1), second.prompts.take(1)) // 同一個計畫：第 4 張主題不變
+        val names = paths.wallpapers.listFiles()!!.map { it.name }.sorted()
+        assertEquals(5, names.size)
+        assertEquals((1..5).map { "-abcd1234-$it.jpg" }.toSet(), names.map { it.substring(it.indexOf("-abcd1234-")) }.toSet())
+    }
+
+    @Test fun manualResumeRecropsWhenOnlyOriginalExists() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val png = TestSupport.png(4, 8)
+        service(ScriptedProvider(png, png), paths, aiOnly).runManual(day, 2, runID = "r1")
+        val jpg = paths.wallpapers.listFiles()!!.first { it.name.endsWith("-r1-2.jpg") }
+        assertTrue(jpg.delete())
+        val again = ScriptedProvider()
+        assertEquals(2, service(again, paths, aiOnly).runManual(day, 2, runID = "r1").size)
+        assertEquals(0, again.prompts.size)
+        assertTrue(jpg.isFile)
+    }
+
     @Test fun mismatchedProgressFileIsRejected() {
         val paths = AppPaths(TestSupport.tempDir())
         DailyBatch(5, emptyList(), List(5) { 0 }, now, null).save(paths.root, day)

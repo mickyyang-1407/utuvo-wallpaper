@@ -93,6 +93,11 @@ fun GalleryScreen(model: AppModel, open: (String, List<String>) -> Unit) {
                     else stringResource(R.string.generating_progress, r.done, r.total), fontSize = 14.sp)
                     Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator({ if (r.total > 0) r.done / r.total.toFloat() else 0f }, Modifier.fillMaxWidth(), color = Palette.accent)
+                    if (r.kind != "daily") {
+                        androidx.compose.material3.TextButton({ Jobs.cancelGenerate(ctx) }, Modifier.testTag("cancel-generate")) {
+                            Text(stringResource(R.string.cancel), color = Palette.red)
+                        }
+                    }
                 }
             }
         }
