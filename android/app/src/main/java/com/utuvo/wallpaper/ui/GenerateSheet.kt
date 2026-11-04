@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -85,14 +86,14 @@ fun GenerateSheet(model: AppModel, dismiss: () -> Unit) {
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.count), modifier = Modifier.weight(1f))
-                Text(stringResource(R.string.wallpapers_count, count), color = Palette.secondary)
+                Text(pluralStringResource(R.plurals.wallpapers_count, count, count), color = Palette.secondary)
             }
             Slider(count.toFloat(), { count = it.toInt().coerceIn(1, 10) }, valueRange = 1f..10f, steps = 8,
                 colors = SliderDefaults.colors(thumbColor = Palette.accent, activeTrackColor = Palette.accent), modifier = Modifier.testTag("count-slider"))
             Spacer(Modifier.height(8.dp))
             Row {
                 Text(stringResource(R.string.category), modifier = Modifier.weight(1f))
-                Text(if (picked.isEmpty()) stringResource(R.string.all_categories) else stringResource(R.string.n_categories, picked.size), color = Palette.secondary)
+                Text(if (picked.isEmpty()) stringResource(R.string.all_categories) else pluralStringResource(R.plurals.n_categories, picked.size, picked.size), color = Palette.secondary)
             }
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

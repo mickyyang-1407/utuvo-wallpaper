@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -155,7 +156,7 @@ private fun Overview(model: AppModel, openCategory: (String) -> Unit) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(stringResource(R.string.today_new, OverviewFacts.todayNew(model.items, now)), fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
-            Text(stringResource(R.string.wallpapers_count, model.items.size), color = Palette.secondary, fontSize = 13.sp)
+            Text(pluralStringResource(R.plurals.wallpapers_count, model.items.size, model.items.size), color = Palette.secondary, fontSize = 13.sp)
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth().height(22.dp).clip(RoundedCornerShape(6.dp)), horizontalArrangement = Arrangement.spacedBy(2.dp)) {

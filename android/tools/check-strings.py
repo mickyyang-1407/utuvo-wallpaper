@@ -12,6 +12,10 @@ def load(p):
         if s.get("translatable") == "false":
             continue
         out[s.get("name")] = s.text or ""
+    # 複數字串：英文有 one／other，繁中只有 other；用 other 那一句比對格式參數。
+    for p in ET.parse(p).getroot().iter("plurals"):
+        other = [i.text or "" for i in p.iter("item") if i.get("quantity") == "other"]
+        out["plurals:" + p.get("name")] = other[0] if other else ""
     return out
 
 en, zh = load(res / "values/strings.xml"), load(res / "values-zh-rTW/strings.xml")

@@ -4,7 +4,9 @@
     <string name="tab_dynamic">日夜</string>
     <string name="tab_settings">設定</string>
     <string name="today_new">今天新增 %1$d 張</string>
-    <string name="wallpapers_count">%1$d 張</string>
+    <plurals name="wallpapers_count">
+        <item quantity="other">%1$d張</item>
+    </plurals>
     <string name="overview_hint">實心是今天新的，淡色是之前的。點一段可打開該分類。</string>
     <string name="filter_all">全部</string>
     <string name="filter_favorites">收藏</string>
@@ -35,7 +37,9 @@
     <string name="count">張數</string>
     <string name="category">分類</string>
     <string name="all_categories">全部分類</string>
-    <string name="n_categories">%1$d 個分類</string>
+    <plurals name="n_categories">
+        <item quantity="other">%1$d個分類</item>
+    </plurals>
     <string name="own_prompt">自己的 Prompt（選填）</string>
     <string name="prompt_example">例如：手繪動畫風的海邊小鎮巷弄、窗台上打盹的貓（水彩）、雨天的街角咖啡店</string>
     <string name="ai_idea">AI 靈感</string>
