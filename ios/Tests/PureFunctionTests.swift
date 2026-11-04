@@ -320,3 +320,12 @@ final class RotationReviewFixTests: XCTestCase {
         XCTAssertEqual(CurrentWallpaper.lookahead(solar), 300)
     }
 }
+
+final class DetailPagingTests: XCTestCase {
+    func testNeighborAfterDelete() {
+        XCTAssertEqual(WallpaperLibrary.neighborID(of: "b", in: ["a", "b", "c"]), "c")
+        XCTAssertEqual(WallpaperLibrary.neighborID(of: "c", in: ["a", "b", "c"]), "b")
+        XCTAssertNil(WallpaperLibrary.neighborID(of: "a", in: ["a"]))
+        XCTAssertNil(WallpaperLibrary.neighborID(of: "x", in: ["a", "b"]))
+    }
+}

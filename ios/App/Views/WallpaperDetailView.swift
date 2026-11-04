@@ -4,9 +4,28 @@ struct WallpaperDetailView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
-    let item: WallpaperItem
+    /// 打開時那一頁的清單（圖庫目前的篩選結果），左右滑動換上一張／下一張。
+    let items: [WallpaperItem]
+    var onPageChange: (String) -> Void = { _ in }
+    @State private var currentID: String?
     @State private var shareURL: URL?
     @State private var confirmDelete = false
+
+    init(items: [WallpaperItem], startID: String, onPageChange: @escaping (String) -> Void = { _ in }) {
+        self.items = items
+        self.onPageChange = onPageChange
+        _currentID = State(initialValue: startID)
+    }
+
+    /// 已被刪掉的不再出現。
+    private var pages: [WallpaperItem] {
+        let alive = Set(model.items.map(\.id))
+        return items.filter { alive.contains($0.id) }
+    }
+    private var item: WallpaperItem {
+        pages.first { $0.id == currentID } ?? pages.first ?? items[0]
+    }
+    private var pageIndex: Int { pages.firstIndex { $0.id == item.id } ?? 0 }
 
     private var isPinned: Bool { model.pinnedID == item.id }
     private var isFavorite: Bool { model.favorites.contains(item.id) }
@@ -14,7 +33,15 @@ struct WallpaperDetailView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
-            ThumbnailView(url: item.url, maxPixel: 3000).ignoresSafeArea()
+            TabView(selection: $currentID) {
+                ForEach(pages) { page in
+                    ThumbnailView(url: page.url, maxPixel: 3000).ignoresSafeArea()
+                        .tag(Optional(page.id))
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
+            .accessibilityIdentifier("detailPager")
             VStack(spacing: 12) {
                 HStack(spacing: 14) {
                     roundButton(isFavorite ? "heart.fill" : "heart", isFavorite ? L("已收藏") : L("收藏"),
@@ -38,9 +65,18 @@ struct WallpaperDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .confirmationDialog(L("刪除這張桌布？"), isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button(L("刪除"), role: .destructive) { model.delete(item); dismiss() }
+            Button(L("刪除"), role: .destructive) {
+                let gone = item
+                let next = WallpaperLibrary.neighborID(of: gone.id, in: pages.map(\.id))
+                model.delete(gone)
+                if let next { currentID = next } else { dismiss() }
+            }
         }
-        .task { shareURL = model.deviceFile(for: item) }
+        .task(id: item.id) {
+            shareURL = nil
+            shareURL = model.deviceFile(for: item)
+        }
+        .onChange(of: currentID) { _, id in if let id { onPageChange(id) } }
     }
 
     private var actionBar: some View {
@@ -49,8 +85,14 @@ struct WallpaperDetailView: View {
         return HStack(spacing: 10) {
             IconTile(symbol: style.symbol, color: style.color, size: 30)
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.isDemo ? L("示範圖") : WallpaperCategory.title(item.category))
-                    .font(.subheadline.weight(.semibold)).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(item.isDemo ? L("示範圖") : WallpaperCategory.title(item.category))
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                    if pages.count > 1 {
+                        Text(verbatim: "\(pageIndex + 1)／\(pages.count)")
+                            .font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1).fixedSize()
+                    }
+                }
                 Text(verbatim: "\(Int(size.width))×\(Int(size.height))")
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
             }

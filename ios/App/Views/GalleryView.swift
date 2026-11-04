@@ -43,7 +43,9 @@ struct GalleryView: View {
             .background(CanvasBackground())
             .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: WallpaperItem.self) { WallpaperDetailView(item: $0) }
+            .navigationDestination(for: WallpaperItem.self) { start in
+                WallpaperDetailView(items: shown.contains(start) ? shown : [start], startID: start.id) { selectedID = $0 }
+            }
             .sheet(isPresented: $showGenerate) {
                 GenerateSheet(openSettings: { tab = .settings })
                     .presentationDetents([.large])

@@ -28,6 +28,12 @@ enum DemoAssets {
 }
 
 enum WallpaperLibrary {
+    /// 大圖頁刪掉一張後要停在哪張：優先下一張，最後一張就退回上一張；只剩它自己就是 nil。
+    static func neighborID(of id: String, in ids: [String]) -> String? {
+        guard let i = ids.firstIndex(of: id), ids.count > 1 else { return nil }
+        return i + 1 < ids.count ? ids[i + 1] : ids[i - 1]
+    }
+
     /// 生成的桌布（新的在前）＋示範圖（最後）。
     static func load(paths: AppPaths, bundle: Bundle = .main) -> [WallpaperItem] {
         let entries = (try? FileManager.default.contentsOfDirectory(
