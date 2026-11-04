@@ -126,6 +126,7 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 .any { !it.state.isFinished }
             if (active || Jobs.isBusy()) return false
             cancelRequested = false
+            AppEnv.get(context).raw.edit().remove(YOUNG_SKIPS).commit()
             // 續作識別碼（檔名用）放在輸入資料裡：工作被重新排入時仍是同一個，已做完的檔案會被沿用。
             val full = Data.Builder().putAll(data).putString(RUN_ID, com.utuvo.wallpaper.core.RandomID.make()).build()
             AppEnv.get(context).raw.edit().putString(PENDING, android.util.Base64.encodeToString(full.toByteArray(), android.util.Base64.NO_WRAP)).commit()
@@ -152,7 +153,7 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 .setInputData(data).setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build())
         }
 
-        fun clearPending(context: Context) { AppEnv.get(context).raw.edit().remove(PENDING).commit() }
+        fun clearPending(context: Context) { AppEnv.get(context).raw.edit().remove(PENDING).remove(YOUNG_SKIPS).commit() }
 
         /**
          * 保險：行程被殺後 WorkManager 與 JobScheduler 偶爾會互相取消，留下一個「排隊中但沒有排程」的工作
@@ -180,8 +181,10 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
             }
             val data = runCatching { Data.fromByteArray(android.util.Base64.decode(saved, android.util.Base64.NO_WRAP)) }.getOrNull()
                 ?: run { clearPending(context); return false }
-            Log.i(TAG, "generate kick: re-enqueue unfinished work")
-            submit(wm, data, ExistingWorkPolicy.REPLACE)
+            // ignoreYoung（行程剛起來就硬查）時 WorkManager 可能正把工作排回來、狀態還沒變成 RUNNING：
+            // 用 KEEP，絕不取消可能已在送請求的那個（避免重付）；真的卡住的排隊工作留給下一次一般檢查用 REPLACE 處理。
+            Log.i(TAG, "generate kick: re-enqueue unfinished work" + if (ignoreYoung) " (keep)" else "")
+            submit(wm, data, if (ignoreYoung) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE)
             return false
         }
     }

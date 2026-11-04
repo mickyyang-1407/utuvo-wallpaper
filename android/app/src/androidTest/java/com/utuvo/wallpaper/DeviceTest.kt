@@ -148,6 +148,11 @@ class DeviceTest {
         AppEnv.get(ctx).raw.edit().remove("gen.pending").commit()
         assertEquals(false, com.utuvo.wallpaper.platform.GenerateWorker.kick(ctx, ignoreYoung = true))
         assertEquals(2, com.utuvo.wallpaper.platform.GenerateWorker.MAX_YOUNG_SKIPS)
+        // 計數在清掉續作紀錄時歸零，不會帶到下一次產生。
+        val raw = AppEnv.get(ctx).raw
+        raw.edit().putString("gen.pending", "x").putInt(com.utuvo.wallpaper.platform.GenerateWorker.YOUNG_SKIPS, 2).commit()
+        com.utuvo.wallpaper.platform.GenerateWorker.clearPending(ctx)
+        assertEquals(false, raw.contains(com.utuvo.wallpaper.platform.GenerateWorker.YOUNG_SKIPS))
     }
 
     private fun hash(b: Bitmap): String {
