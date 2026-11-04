@@ -274,7 +274,10 @@ object Jobs {
     fun launchAuto(context: Context): Boolean {
         val env = AppEnv.get(context)
         val prev = AutoStateFile.read(env.paths)
-        val state = DynamicAutoPlanner.manual(env.data, prev, AppClock.now(context), env.prefs.dynamicAutoFrequency,
+        // 上一組在送出途中被中斷（不會自動重送）：使用者這次明確按了，就當上一組結束、另開新的一組。
+        val base = prev?.takeIf { !it.completed && SceneGenerationService.isInterrupted(env.paths, it.sceneID) }
+            ?.copy(completed = true) ?: prev
+        val state = DynamicAutoPlanner.manual(env.data, base, AppClock.now(context), env.prefs.dynamicAutoFrequency,
             chinese = Strings.isChinese(context))
         AutoStateFile.write(env.paths, state)
         val ok = GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "auto",

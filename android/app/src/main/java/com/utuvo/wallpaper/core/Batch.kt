@@ -397,6 +397,12 @@ class SceneGenerationService(
     companion object {
         val RELIGHT_ORDER = listOf(DayPhase.DAWN, DayPhase.DUSK, DayPhase.NIGHT)
 
+        /** 這組場景有付費請求在送出途中被中斷（續作會丟 [GenerationError.Interrupted]）。 */
+        fun isInterrupted(paths: AppPaths, id: String): Boolean {
+            val dir = File(paths.dynamic, id)
+            return (listOf("day") + RELIGHT_ORDER.map { it.raw }).any { InFlight.interrupted(File(dir, "$it.png")) }
+        }
+
         /** 目前已發布的場景；沒有或未完成回 null。 */
         fun published(paths: AppPaths): SceneRecord? = SceneRecord.read(paths.currentScenePointer)?.takeIf { it.completed }
     }

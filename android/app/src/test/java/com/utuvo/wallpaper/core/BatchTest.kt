@@ -238,6 +238,10 @@ class BatchTest {
         assertTrue(again.prompts.isEmpty())
         assertTrue(again.relights.isEmpty())
         assertNull(SceneGenerationService.published(paths))
+        assertTrue(SceneGenerationService.isInterrupted(paths, "s9"))
+        // 完整做好的場景不算中斷。
+        SceneGenerationService(ScriptedProvider(), paths, FakeCodec(), 108, 234).generate("river", "ok1")
+        assertFalse(SceneGenerationService.isInterrupted(paths, "ok1"))
     }
 
     @Test fun manualResumeRecropsWhenOnlyOriginalExists() {
