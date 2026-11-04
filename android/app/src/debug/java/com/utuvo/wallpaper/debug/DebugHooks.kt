@@ -31,7 +31,11 @@ object DebugHooks {
     private fun sp(context: Context) = context.getSharedPreferences("debug", Context.MODE_PRIVATE)
 
     fun clockOffsetMs(context: Context): Long = sp(context).getLong("offset", 0L)
-    fun fakeProvider(context: Context): ImageProvider? = if (sp(context).getBoolean("fake", false)) FakeProvider else null
+    fun fakeProvider(context: Context): ImageProvider? {
+        if (!sp(context).getBoolean("fake", false)) return null
+        FakeProvider.delayMs = sp(context).getLong("fakeDelayMs", 150L)
+        return FakeProvider
+    }
     fun baseUrl(context: Context): String? = sp(context).getString("baseUrl", null)
     fun forceDaily(context: Context): Boolean = sp(context).getBoolean("forceDaily", false)
 
@@ -40,9 +44,11 @@ object DebugHooks {
 
 /** 不連網：依提示詞雜湊畫一張 1152×2048 漸層 PNG；relight 把參考圖染色。 */
 object FakeProvider : ImageProvider {
+    /** 每張假裝花多久（Debug 廣播 fakeDelay 可調慢，用來測中途被系統殺掉）。 */
+    @Volatile var delayMs = 150L
     override fun generateImage(prompt: String): ByteArray {
         val p = OpenAIImageProvider.validatePrompt(prompt)
-        Thread.sleep(150)
+        Thread.sleep(delayMs)
         val h = StableHash.of(p)
         val c1 = Color.HSVToColor(floatArrayOf((h % 360u).toFloat(), 0.55f, 0.85f))
         val c2 = Color.HSVToColor(floatArrayOf(((h shr 12) % 360u).toFloat(), 0.7f, 0.35f))
@@ -56,7 +62,7 @@ object FakeProvider : ImageProvider {
 
     override fun relight(reference: ByteArray, prompt: String): ByteArray {
         val p = OpenAIImageProvider.validatePrompt(prompt)
-        Thread.sleep(150)
+        Thread.sleep(delayMs)
         val src = BitmapFactory.decodeByteArray(reference, 0, reference.size) ?: throw IllegalStateException()
         val bm = src.copy(Bitmap.Config.ARGB_8888, true)
         src.recycle()
@@ -93,6 +99,11 @@ class DebugReceiver : BroadcastReceiver() {
         val env = AppEnv.get(context)
         when (cmd) {
             "fake" -> DebugHooks.edit(context).putBoolean("fake", intent.getBooleanExtra("on", true)).commit()
+            "fakeDelay" -> DebugHooks.edit(context).putLong("fakeDelayMs", intent.getLongExtra("ms", 150L)).commit()
+            "generate" -> Log.i(TAG, "debug generate enqueued=" + com.utuvo.wallpaper.platform.Jobs.launchManual(context,
+                intent.getIntExtra("count", 4), com.utuvo.wallpaper.core.DailyRecipe().withCategory(AppEnv.get(context).data, "自然", true)))
+            "scene" -> Log.i(TAG, "debug scene enqueued=" + com.utuvo.wallpaper.platform.Jobs.launchScene(context,
+                intent.getStringExtra("prompt") ?: "a quiet harbor at the edge of town"))
             "forceDaily" -> DebugHooks.edit(context).putBoolean("forceDaily", intent.getBooleanExtra("on", true)).commit()
             "offset" -> { DebugHooks.edit(context).putLong("offset", intent.getLongExtra("ms", 0L)).commit(); Scheduler.sync(context) }
             // 把 App 時間快轉到「下一個時段開始前 N 秒」，再排鬧鐘：到點由 AlarmManager 自己觸發。

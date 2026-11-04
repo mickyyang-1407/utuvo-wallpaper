@@ -145,11 +145,18 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun shareIntent(item: WallpaperItem): Intent? {
-        val file = Wallpapers.deviceFile(ctx, item) ?: return null
-        val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", file)
-        return Intent.createChooser(Intent(Intent.ACTION_SEND).setType("image/jpeg").putExtra(Intent.EXTRA_STREAM, uri)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), null)
+    /** 準備好要開的分享選單（介面看到就開，開完清空）。 */
+    var pendingShare by mutableStateOf<Intent?>(null)
+
+    /** 分享：先在背景準備好檔案（示範圖要裁切），再交給介面開 chooser。 */
+    fun share(item: WallpaperItem) {
+        viewModelScope.launch {
+            val file = withContext(Dispatchers.IO) { Wallpapers.deviceFile(ctx, item) }
+            if (file == null) { message = ctx.getString(R.string.file_missing); return@launch }
+            val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", file)
+            pendingShare = Intent.createChooser(Intent(Intent.ACTION_SEND).setType("image/jpeg").putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), null)
+        }
     }
 
     /** 手動產生。回傳 null＝已開始；否則是錯誤訊息。 */
@@ -197,11 +204,12 @@ object Thumbs {
 
 /** 非同步載入的圖（含示範圖）。 */
 @Composable
-fun WallpaperImage(context: Context, item: WallpaperItem?, maxPixel: Int, modifier: Modifier, file: File? = null,
-                   scale: ContentScale = ContentScale.Crop, revision: Int = 0) {
-    val image by produceState<ImageBitmap?>(null, item?.id, file?.path, revision) {
+fun WallpaperImage(context: Context, item: WallpaperItem?, maxPixel: Int, modifier: Modifier, key: String? = null,
+                   load: (() -> File?)? = null, scale: ContentScale = ContentScale.Crop, revision: Int = 0) {
+    // 找檔（示範圖第一次要從 assets 裁 5K 圖）與解碼都在 IO 執行緒。
+    val image by produceState<ImageBitmap?>(null, item?.id, key, revision) {
         value = withContext(Dispatchers.IO) {
-            val f = file ?: item?.let { Wallpapers.deviceFile(context, it) }
+            val f = load?.invoke() ?: item?.let { Wallpapers.deviceFile(context, it) }
             f?.let { Thumbs.load(it, maxPixel)?.asImageBitmap() }
         }
     }

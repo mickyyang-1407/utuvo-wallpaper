@@ -18,6 +18,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.utuvo.wallpaper.core.CurrentWallpaper
 import com.utuvo.wallpaper.core.DailyGenerationService
 import com.utuvo.wallpaper.core.DailyRecipe
@@ -158,6 +159,17 @@ object Wallpapers {
         return ok to turnedOff
     }
 
+    /**
+     * 新場景生成完：dynamicSceneID 已是新場景（[Jobs.runScene] 設的）。不替使用者開日夜；
+     * 只有日夜本來就開著才換成新場景目前時段（仍受「按過套用才自動換」的門檻）。回傳換上的 key。
+     */
+    fun sceneReady(context: Context): String? {
+        if (!AppEnv.get(context).prefs.dynamicEnabled) return null
+        val key = refresh(context)
+        Scheduler.armPhaseAlarm(context)
+        return key
+    }
+
     /** 「套用日夜桌布」：開日夜、清固定、換成目前時段。 */
     fun applyDynamic(context: Context): DayPhase? {
         val env = AppEnv.get(context)
@@ -201,17 +213,23 @@ object Jobs {
             DeviceScreen.nativePixels(context).first, DeviceScreen.nativePixels(context).second, recipe,
             nowMs = { AppClock.nowMs(context) })
 
-    /** 手動產生（背景跑，關掉面板也會繼續）。 */
-    fun launchManual(context: Context, count: Int, recipe: DailyRecipe): Boolean {
-        if (isBusy()) return false
-        val app = context.applicationContext
-        scope.launch {
-            val env = AppEnv.get(app)
-            val day = AppPaths.dayString(AppClock.now(app))
-            val r = exclusive("manual", count) { p -> daily(app, env, recipe).runManual(day, count, progress = p) }
-            if (r != null) finished.value = r.map { "manual" to it.size }
+    /** 手動產生：交給 WorkManager（切到背景、行程被回收都會跑完或續作）。 */
+    fun launchManual(context: Context, count: Int, recipe: DailyRecipe): Boolean =
+        GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "manual", GenerateWorker.COUNT to count,
+            GenerateWorker.STYLES to recipe.styles.toTypedArray(), GenerateWorker.IDEA to recipe.idea))
+
+    /** 手動產生的實際工作；[alreadyDone] 是上次被中斷前已完成的張數（續作只補剩下的）。 */
+    fun runManual(context: Context, count: Int, recipe: DailyRecipe, alreadyDone: Int, saveDone: (Int) -> Unit): Result<Int>? {
+        val env = AppEnv.get(context)
+        val day = AppPaths.dayString(AppClock.now(context))
+        val left = count - alreadyDone
+        if (left <= 0) return Result.success(count)
+        return exclusive("manual", count) { p ->
+            p(alreadyDone, count)
+            daily(context, env, recipe).runManual(day, left, progress = { d, _ ->
+                saveDone(alreadyDone + d); p(alreadyDone + d, count)
+            }).size + alreadyDone
         }
-        return true
     }
 
     /** 每日批次（背景工作與 Debug 都走這裡）。 */
@@ -222,28 +240,27 @@ object Jobs {
         return exclusive("daily", DailyGenerationService.BATCH_SIZE) { p -> daily(context, env).run(day, progress = p).size }
     }
 
-    /** 日夜場景生成。完成後切到這個場景並開啟日夜。 */
+    /** 日夜場景生成（同 id 續作不重付）。完成後只把場景設成新的（跟 iPhone 一樣不自動開日夜）。 */
     fun runScene(context: Context, prompt: String, id: String? = null): Result<String>? {
         val env = AppEnv.get(context)
         val (w, h) = DeviceScreen.nativePixels(context)
         val svc = SceneGenerationService(Providers.make(context), env.paths, BitmapCodec, w, h)
         return exclusive("scene", 4) { p ->
-            val rec = if (id != null) svc.generate(prompt, id) { p(it, 4) } else svc.generate(prompt) { p(it, 4) }
+            val step: (Int) -> Unit = { Log.i(TAG, "scene progress: $it/4"); p(it, 4) }
+            val rec = if (id != null) svc.generate(prompt, id, step) else svc.generate(prompt, progress = step)
             env.prefs.dynamicSceneID = rec.id
             rec.id
         }
     }
 
-    fun launchScene(context: Context, prompt: String): Boolean {
-        if (isBusy()) return false
-        val app = context.applicationContext
-        scope.launch {
-            val r = runScene(app, prompt) ?: return@launch
-            r.onSuccess { Wallpapers.applyDynamic(app) }
-            finished.value = r.map { "scene" to 4 }
-        }
-        return true
-    }
+    /** 自己描述的場景：交給 WorkManager；場景 id 先決定好，中斷後用同一個 id 續作。 */
+    fun launchScene(context: Context, prompt: String): Boolean =
+        GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "scene", GenerateWorker.PROMPT to prompt,
+            GenerateWorker.SCENE_ID to "scene-" + com.utuvo.wallpaper.core.RandomID.make()))
+
+    /** 「現在用 AI 生成一組」：交給 WorkManager。 */
+    fun launchAuto(context: Context): Boolean =
+        GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "auto"))
 
     /** 日夜 AI 自動：到期就生成一組，失敗記重試。manual＝使用者按「現在用 AI 生成一組」。 */
     fun runDynamicAuto(context: Context, manual: Boolean): Result<String>? {
@@ -259,7 +276,7 @@ object Jobs {
         val r = runScene(context, state.prompt, state.sceneID) ?: return null
         r.onSuccess {
             AutoStateFile.write(env.paths, counted.recordSuccess())
-            Wallpapers.applyDynamic(context)
+            Wallpapers.sceneReady(context)
         }.onFailure { e ->
             AutoStateFile.write(env.paths, counted.recordFailure(RetryPolicy.isRetryable(e), AppClock.nowMs(context)))
         }
@@ -354,6 +371,11 @@ class PhaseAlarmReceiver : BroadcastReceiver() {
 /** 開機、更新 App、改時間／時區後重新排程。 */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // exported：別的 App 也能送明確 intent 進來，只接受 manifest 列的系統廣播。
+        if (!SystemActions.isReschedule(intent.action)) {
+            Log.w(TAG, "ignored broadcast: ${intent.action}")
+            return
+        }
         Log.i(TAG, "reschedule after ${intent.action}")
         val pending = goAsync()
         Thread {
@@ -397,4 +419,16 @@ class DailyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         }
         return Result.success()
     }
+}
+
+/** BootReceiver 接受的系統廣播（跟 AndroidManifest 的 intent-filter 一致）。 */
+object SystemActions {
+    val RESCHEDULE = setOf(
+        "android.intent.action.BOOT_COMPLETED",
+        "android.intent.action.MY_PACKAGE_REPLACED",
+        "android.intent.action.TIME_SET",
+        "android.intent.action.TIMEZONE_CHANGED",
+    )
+
+    fun isReschedule(action: String?): Boolean = action != null && action in RESCHEDULE
 }

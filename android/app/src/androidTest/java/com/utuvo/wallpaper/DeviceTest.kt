@@ -87,6 +87,48 @@ class DeviceTest {
         assertEquals(listOf(fmt(1), fmt(2), fmt(1), fmt(1)), seen)
     }
 
+    private fun useFakeProvider() {
+        // Debug 版才有假 provider（src/debug 的 DebugHooks 讀這個偏好）。
+        ctx.getSharedPreferences("debug", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("fake", true).putLong("fakeDelayMs", 50L).commit()
+    }
+
+    /** 新場景生成完、日夜沒開：只換場景 id，不開日夜、不換桌布（跟 iPhone 一樣）。 */
+    @Test fun sceneReadyDoesNotTurnOnDynamic() {
+        useFakeProvider()
+        val prefs = AppEnv.get(ctx).prefs
+        prefs.dynamicEnabled = false
+        val before = Wallpapers.lastApplied(ctx)
+        val id = "scene-test-off"
+        val r = com.utuvo.wallpaper.platform.Jobs.runScene(ctx, "a quiet harbor", id)!!
+        assertTrue(r.exceptionOrNull()?.toString(), r.isSuccess)
+        assertEquals(null, Wallpapers.sceneReady(ctx))
+        assertEquals(id, prefs.dynamicSceneID)
+        assertEquals(false, prefs.dynamicEnabled)
+        assertEquals(before, Wallpapers.lastApplied(ctx))
+    }
+
+    /** 日夜本來就開著（使用者按過套用）：新場景完成就換成新場景目前時段。 */
+    @Test fun sceneReadyRefreshesWhenDynamicOn() {
+        useFakeProvider()
+        val prefs = AppEnv.get(ctx).prefs
+        assertTrue(Wallpapers.applyDynamic(ctx) != null)
+        val id = "scene-test-on"
+        val r = com.utuvo.wallpaper.platform.Jobs.runScene(ctx, "a mountain lake", id)!!
+        assertTrue(r.exceptionOrNull()?.toString(), r.isSuccess)
+        val key = Wallpapers.sceneReady(ctx)
+        Log.i("UTUVOWallpaperTest", "sceneReady on: $key")
+        assertTrue("$key", key != null && key.startsWith("dynamic:$id:"))
+        assertEquals(true, prefs.dynamicEnabled)
+        assertEquals(key, Wallpapers.lastApplied(ctx))
+    }
+
+    /** exported 的 BootReceiver 收到別的 action 直接忽略（沒走到 goAsync，否則這裡會丟例外／閃退）。 */
+    @Test fun bootReceiverIgnoresForeignActions() {
+        com.utuvo.wallpaper.platform.BootReceiver().onReceive(ctx, android.content.Intent("com.example.EVIL"))
+        com.utuvo.wallpaper.platform.BootReceiver().onReceive(ctx, android.content.Intent())
+    }
+
     private fun hash(b: Bitmap): String {
         val px = IntArray(b.width * b.height)
         b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)

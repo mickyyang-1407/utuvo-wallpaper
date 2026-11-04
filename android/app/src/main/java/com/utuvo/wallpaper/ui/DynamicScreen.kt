@@ -92,9 +92,9 @@ fun DynamicScreen(model: AppModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (p in listOf(DayPhase.DAWN, DayPhase.DAY, DayPhase.DUSK, DayPhase.NIGHT)) {
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        val file = remember(sceneID, p) { Wallpapers.phaseFile(ctx, sceneID, p) }
                         Box(Modifier.fillMaxWidth().aspectRatio(9f / 19.5f).clip(RoundedCornerShape(10.dp))) {
-                            WallpaperImage(ctx, null, 360, Modifier.fillMaxSize(), file = file)
+                            WallpaperImage(ctx, null, 360, Modifier.fillMaxSize(), key = "$sceneID/${p.raw}",
+                                load = { Wallpapers.phaseFile(ctx, sceneID, p) })
                         }
                         Text(Strings.phase(ctx, p.raw) + (schedule.startTime(p, now.toLocalDate(), now.zone)?.let { " $it" } ?: ""),
                             fontSize = 11.sp, color = if (p == phase) Palette.accent else Palette.secondary)
@@ -149,7 +149,7 @@ fun DynamicScreen(model: AppModel) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton({
                     note = if (!Providers.canGenerate(ctx)) ctx.getString(R.string.err_missing_key) else null
-                    if (note == null) Jobs.scope.launchAuto(ctx)
+                    if (note == null && !Jobs.launchAuto(ctx)) note = ctx.getString(R.string.busy)
                 }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.ai_now)) }
                 Text(stringResource(R.string.ai_cost), fontSize = 12.sp, color = Palette.secondary)
             }
@@ -188,12 +188,6 @@ fun DynamicScreen(model: AppModel) {
     if (finished != null || running == null) {
         val id = prefs.dynamicSceneID
         if (id != sceneID) sceneID = id
-    }
-}
-
-private fun kotlinx.coroutines.CoroutineScope.launchAuto(ctx: android.content.Context) {
-    this.launch(kotlinx.coroutines.Dispatchers.IO) {
-        Jobs.runDynamicAuto(ctx.applicationContext, manual = true)?.let { Jobs.finished.value = it.map { "scene" to 4 } }
     }
 }
 

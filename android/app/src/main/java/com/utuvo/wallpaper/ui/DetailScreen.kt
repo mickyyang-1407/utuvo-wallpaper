@@ -111,7 +111,7 @@ fun DetailScreen(model: AppModel, startID: String, close: () -> Unit) {
                 }
                 RoundButton(Icons.Filled.KeyboardArrowDown, stringResource(R.string.save_photos), Color.White, "save") { model.saveToPhotos(item) }
                 RoundButton(Icons.Filled.Share, stringResource(R.string.share), Color.White, "share") {
-                    model.shareIntent(item)?.let { ctx.startActivity(it) }
+                    model.share(item)
                 }
                 if (!item.isDemo) RoundButton(Icons.Filled.Delete, stringResource(R.string.delete), Palette.red, "delete") { confirmDelete = true }
             }
@@ -138,6 +138,9 @@ fun DetailScreen(model: AppModel, startID: String, close: () -> Unit) {
                     modifier = Modifier.testTag("set-wallpaper")) { Text(stringResource(R.string.set_wallpaper)) }
             }
         }
+    }
+    model.pendingShare?.let { intent ->
+        LaunchedEffect(intent) { model.pendingShare = null; ctx.startActivity(intent) }
     }
     if (confirmDelete) {
         AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text(stringResource(R.string.delete_confirm)) },
