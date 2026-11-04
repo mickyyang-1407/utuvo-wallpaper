@@ -120,6 +120,7 @@ object Strings {
         is GenerationError.WriteFailed -> context.getString(R.string.err_write)
         is GenerationError.Cancelled -> context.getString(R.string.err_cancelled)
         is GenerationError.Cooldown -> context.getString(R.string.err_cooldown)
+        is GenerationError.Interrupted -> context.getString(R.string.err_interrupted)
         else -> context.getString(R.string.err_generic)
     }
 }

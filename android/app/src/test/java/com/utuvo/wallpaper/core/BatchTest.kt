@@ -195,6 +195,51 @@ class BatchTest {
         assertEquals((1..5).map { "-abcd1234-$it.jpg" }.toSet(), names.map { it.substring(it.indexOf("-abcd1234-")) }.toSet())
     }
 
+    @Test fun manualDoesNotResendRequestInterruptedMidFlight() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val png = TestSupport.png(4, 8)
+        // 第 2 張送出後行程就死了（不是 GenerationError，標記留著）。
+        val first = ScriptedProvider(png, IllegalStateException("process killed"))
+        try { service(first, paths, aiOnly).runManual(day, 3, runID = "k1"); fail() } catch (e: IllegalStateException) { }
+        assertEquals(2, first.prompts.size)
+        // 重跑：第 2 張不重送（可能已收費），只送第 3 張。
+        val second = ScriptedProvider(png)
+        val results = service(second, paths, aiOnly).runManual(day, 3, runID = "k1")
+        assertEquals(2, results.size)
+        assertEquals(listOf(first.prompts[0]), listOf(first.prompts[0]))
+        assertEquals(1, second.prompts.size)
+        assertFalse(second.prompts[0] == first.prompts[1])
+        // 再跑一次也一樣不送（標記沒被清掉）。
+        val third = ScriptedProvider()
+        assertEquals(2, service(third, paths, aiOnly).runManual(day, 3, runID = "k1").size)
+        assertEquals(0, third.prompts.size)
+    }
+
+    @Test fun manualErrorWithKnownOutcomeClearsMarker() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val png = TestSupport.png(4, 8)
+        try { service(ScriptedProvider(GenerationError.HttpStatus(500)), paths, aiOnly).runManual(day, 1, runID = "h1"); fail() }
+        catch (e: GenerationError.HttpStatus) { }
+        assertTrue(paths.originals.listFiles().orEmpty().none { it.name.endsWith(".inflight") })
+        val again = ScriptedProvider(png)
+        assertEquals(1, service(again, paths, aiOnly).runManual(day, 1, runID = "h1").size)
+        assertEquals(1, again.prompts.size)
+    }
+
+    @Test fun sceneDoesNotResendInterruptedRequest() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val png = TestSupport.png(4, 8)
+        // 白天那張好了，清晨那張送出後行程死掉。
+        val first = ScriptedProvider(png, IllegalStateException("process killed"))
+        try { SceneGenerationService(first, paths, FakeCodec(), 108, 234).generate("lake", "s9"); fail() } catch (e: IllegalStateException) { }
+        val again = ScriptedProvider()
+        try { SceneGenerationService(again, paths, FakeCodec(), 108, 234).generate("lake", "s9"); fail() }
+        catch (e: GenerationError) { assertEquals(GenerationError.Interrupted, e) }
+        assertTrue(again.prompts.isEmpty())
+        assertTrue(again.relights.isEmpty())
+        assertNull(SceneGenerationService.published(paths))
+    }
+
     @Test fun manualResumeRecropsWhenOnlyOriginalExists() {
         val paths = AppPaths(TestSupport.tempDir())
         val png = TestSupport.png(4, 8)

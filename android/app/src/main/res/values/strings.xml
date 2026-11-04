@@ -131,6 +131,7 @@
     <string name="err_decoding">The image data in the response couldn\'t be decoded.</string>
     <string name="err_write">Couldn\'t write the file.</string>
     <string name="err_cancelled">Cancelled.</string>
+    <string name="err_interrupted">The last request was interrupted mid-flight. To avoid paying twice it was not resent. Please generate a new set.</string>
     <string name="err_cooldown">Today\'s batch is cooling down or has used up its retries. Try again later.</string>
     <string name="err_generic">Generation failed.</string>
     <string name="k_other">Other</string>

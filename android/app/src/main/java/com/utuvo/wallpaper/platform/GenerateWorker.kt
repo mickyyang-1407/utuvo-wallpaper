@@ -51,7 +51,8 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
             }
             "scene" -> Jobs.runScene(ctx, inputData.getString(PROMPT) ?: "", inputData.getString(SCENE_ID), stop, userStarted = true)
                 ?.map { Wallpapers.sceneReady(ctx); 4 }
-            "auto" -> Jobs.runDynamicAuto(ctx, manual = true, isCancelled = stop, userStarted = true)?.map { 4 }
+            "auto" -> Jobs.runDynamicAuto(ctx, manual = true, isCancelled = stop, userStarted = true,
+                fixedPrompt = inputData.getString(PROMPT), fixedSceneID = inputData.getString(SCENE_ID))?.map { 4 }
             else -> {
                 // 未知種類（不該發生）：清掉續作紀錄，免得看門狗一直重排一個註定失敗的工作。
                 Log.w(TAG, "generate: unknown kind")
@@ -166,7 +167,7 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
          * （同一個續作識別碼）重新排入。已做完的張數靠檔案沿用，不會重付。
          */
         /** 回 true＝因為行程剛啟動而先跳過（看門狗改排短間隔再查）。 */
-        fun kick(context: Context, ignoreYoung: Boolean = false): Boolean {
+        fun kick(context: Context, ignoreYoung: Boolean = false, forceReplace: Boolean = false): Boolean {
             if (Jobs.isBusy()) return false
             // 行程剛起來時 WorkManager 自己會把沒做完的工作排回去並開始跑；先讓它處理，避免兩邊互相取消。
             // ignoreYoung：看門狗已連續短間隔跳過幾次（每次都剛好冷啟動），不再等，直接檢查。
@@ -188,8 +189,11 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 ?: run { clearPending(context); return false }
             // ignoreYoung（行程剛起來就硬查）時 WorkManager 可能正把工作排回來、狀態還沒變成 RUNNING：
             // 用 KEEP，絕不取消可能已在送請求的那個（避免重付）；真的卡住的排隊工作留給下一次一般檢查用 REPLACE 處理。
-            Log.i(TAG, "generate kick: re-enqueue unfinished work" + if (ignoreYoung) " (keep)" else "")
-            submit(wm, data, if (ignoreYoung) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE)
+            // forceReplace：上一輪硬查用 KEEP 之後工作還是沒跑起來＝真的是孤兒，改用 REPLACE 修好。
+            // 就算剛好取消到一個正在送出的請求，送出中標記（InFlight）也會擋住自動重送，不會重付。
+            val keep = ignoreYoung && !forceReplace
+            Log.i(TAG, "generate kick: re-enqueue unfinished work" + if (keep) " (keep)" else "")
+            submit(wm, data, if (keep) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE)
             return false
         }
     }
@@ -208,8 +212,11 @@ class GenerateWatchdogReceiver : android.content.BroadcastReceiver() {
                     val stored = runCatching { raw.getString(GenerateWorker.YOUNG_SKIPS, null) }.getOrNull()?.split(":", limit = 2)
                     val skips = if (stored?.size == 2 && stored[0] == run) stored[1].toIntOrNull() ?: 0 else 0
                     // 最多連續短間隔跳過 2 次；之後即使又是剛冷啟動也直接檢查，不會變成每 30 秒叫醒一次的無限循環。
-                    val skippedYoung = GenerateWorker.kick(context, ignoreYoung = skips >= GenerateWorker.MAX_YOUNG_SKIPS)
-                    raw.edit().putString(GenerateWorker.YOUNG_SKIPS, "$run:${if (skippedYoung) skips + 1 else 0}").commit()
+                    val forced = skips >= GenerateWorker.MAX_YOUNG_SKIPS
+                    val skippedYoung = GenerateWorker.kick(context, ignoreYoung = forced, forceReplace = skips > GenerateWorker.MAX_YOUNG_SKIPS)
+                    // 硬查過（KEEP）也不歸零：下一次若又是剛冷啟動，就改用 REPLACE，不會一直 KEEP 修不好。
+                    val next = if (skippedYoung || (forced && skips == GenerateWorker.MAX_YOUNG_SKIPS)) skips + 1 else 0
+                    raw.edit().putString(GenerateWorker.YOUNG_SKIPS, "$run:$next").commit()
                     // 這次是看門狗把 App 冷啟動的，剛啟動先跳過：30 秒後再查一次，不要等 2 分鐘又冷啟動又跳過。
                     GenerateWorker.armWatchdog(context, if (skippedYoung) GenerateWorker.WATCHDOG_SHORT_MS else GenerateWorker.WATCHDOG_MS)
                     Log.i("UTUVOWallpaper", "generate watchdog: skippedYoung=$skippedYoung skips=$skips")

@@ -49,6 +49,32 @@ object ImageHeaders {
     }
 }
 
+/**
+ * 付費請求的「送出中」標記（`.<檔名>.inflight`）：送出前寫入、結果存檔後清掉。
+ * 行程在送出途中被殺（伺服器可能已經收費）時標記會留著；續作看到標記＋沒有結果檔就不自動重送。
+ * 有明確結果的錯誤（[GenerationError]：伺服器回錯誤碼、逾時、連線失敗、解不開）照原本重試規則走，標記當場清掉。
+ */
+object InFlight {
+    fun marker(target: File) = File(target.parentFile, ".${target.name}.inflight")
+
+    /** 上次送出後沒拿到結果就中斷了。 */
+    fun interrupted(target: File) = !target.isFile && marker(target).isFile
+
+    /** 包住一次付費呼叫；呼叫端存好 [target] 後要呼叫 [clear]。 */
+    fun <T> call(target: File, block: () -> T): T {
+        val m = marker(target)
+        Files.write(ByteArray(0), m)
+        try {
+            return block()
+        } catch (e: GenerationError) {
+            m.delete()
+            throw e
+        }
+    }
+
+    fun clear(target: File) { marker(target).delete() }
+}
+
 /** 檔案小工具：原子寫入（暫存檔＋改名）。 */
 object Files {
     /** 原子寫入；失敗丟 [GenerationError.WriteFailed]。 */
@@ -255,16 +281,21 @@ class DailyGenerationService(
                     continue
                 }
             }
+            if (runID != null && InFlight.interrupted(native)) {
+                // 上次這張送出後行程就被殺了，可能已經收費：不自動重送，這張略過。
+                continue
+            }
             if (isCancelled()) throw GenerationError.Cancelled
             val png = if (runID != null && native.isFile && codec.pixelSize(native.readBytes()) != null) {
                 native.readBytes() // 原生圖已存、裝置尺寸還沒裁：重裁就好。
             } else if (LocalArt.isLocal(planned.prompt)) {
                 codec.encodePng(LocalArt.render(planned.prompt, targetW, targetH) ?: throw GenerationError.Decoding)
             } else {
-                provider.generateImage(PortraitPrompt.convert(planned.prompt))
+                InFlight.call(native) { provider.generateImage(PortraitPrompt.convert(planned.prompt)) }
             }
-            val size = codec.pixelSize(png) ?: throw GenerationError.Decoding
+            val size = codec.pixelSize(png) ?: throw GenerationError.Decoding.also { InFlight.clear(native) }
             Files.write(png, native)
+            InFlight.clear(native)
             Files.write(codec.cropToJpeg(png, targetW, targetH), wallpaper)
             results += GeneratedWallpaper(titleOf(planned), native.name, CropMath.label(size.first, size.second),
                 wallpaper.name, CropMath.label(targetW, targetH), "resampled")
@@ -333,10 +364,12 @@ class SceneGenerationService(
         val baseFile = File(dir, "day.png")
         val base = if (baseFile.isFile) baseFile.readBytes() else {
             // 第一個付費請求送出前也要檢查是否已取消。
+            if (InFlight.interrupted(baseFile)) throw GenerationError.Interrupted
             if (isCancelled()) throw GenerationError.Cancelled
-            provider.generateImage(DayPhase.basePrompt(prompt)).also {
-                if (codec.pixelSize(it) == null) throw GenerationError.Decoding
+            InFlight.call(baseFile) { provider.generateImage(DayPhase.basePrompt(prompt)) }.also {
+                if (codec.pixelSize(it) == null) { InFlight.clear(baseFile); throw GenerationError.Decoding }
                 Files.write(it, baseFile)
+                InFlight.clear(baseFile)
             }
         }
         Files.write(codec.cropToJpeg(base, targetW, targetH), File(dir, "day.jpg"))
@@ -345,9 +378,11 @@ class SceneGenerationService(
             if (isCancelled()) throw GenerationError.Cancelled
             val native = File(dir, phase.raw + ".png")
             val png = if (native.isFile) native.readBytes() else {
-                provider.relight(base, phase.relightPrompt).also {
-                    if (codec.pixelSize(it) == null) throw GenerationError.Decoding
+                if (InFlight.interrupted(native)) throw GenerationError.Interrupted
+                InFlight.call(native) { provider.relight(base, phase.relightPrompt) }.also {
+                    if (codec.pixelSize(it) == null) { InFlight.clear(native); throw GenerationError.Decoding }
                     Files.write(it, native)
+                    InFlight.clear(native)
                 }
             }
             Files.write(codec.cropToJpeg(png, targetW, targetH), File(dir, phase.raw + ".jpg"))

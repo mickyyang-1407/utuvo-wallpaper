@@ -31,6 +31,8 @@ sealed class GenerationError(val kind: String) : Exception(kind) {
     data object WriteFailed : GenerationError("writeFailed") { private fun readResolve(): Any = WriteFailed }
     data object Cancelled : GenerationError("cancelled") { private fun readResolve(): Any = Cancelled }
     data object Cooldown : GenerationError("cooldown") { private fun readResolve(): Any = Cooldown }
+    /** 上一次付費請求送出途中行程被中斷（結果不明）：不自動重送，免得同一張付兩次。 */
+    data object Interrupted : GenerationError("interrupted") { private fun readResolve(): Any = Interrupted }
 }
 
 /** 重試規則（iOS `DailyBatch.isRetryable`＋每日批次冷卻）。 */

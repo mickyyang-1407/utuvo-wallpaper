@@ -27,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,6 +41,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.utuvo.wallpaper.BuildConfig
 import com.utuvo.wallpaper.R
 import com.utuvo.wallpaper.core.AppPaths
@@ -153,7 +156,8 @@ fun SettingsScreen(model: AppModel) {
         GlassCard {
             Row {
                 Text(stringResource(R.string.storage), modifier = Modifier.weight(1f))
-                val bytes = remember { model.env.paths.usedBytes() }
+                // 遞迴掃整個資料夾：放到 IO 執行緒，不卡畫面。
+                val bytes by produceState(0L) { value = withContext(Dispatchers.IO) { model.env.paths.usedBytes() } }
                 Text("%.1f MB".format(bytes / 1_048_576.0), color = Palette.secondary)
             }
             Row {

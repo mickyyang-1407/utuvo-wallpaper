@@ -130,6 +130,7 @@
     <string name="err_decoding">回應的圖片資料解碼失敗。</string>
     <string name="err_write">寫入檔案失敗。</string>
     <string name="err_cancelled">已取消。</string>
+    <string name="err_interrupted">上一次產生在送出途中被系統中斷，為了不重複付費沒有自動重送。請重新產生一組。</string>
     <string name="err_cooldown">今天的批次正在冷卻或已達重試上限，稍後再試。</string>
     <string name="err_generic">生成失敗。</string>
     <string name="k_other">其他</string>

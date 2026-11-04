@@ -107,6 +107,7 @@ class DebugReceiver : BroadcastReceiver() {
                 intent.getIntExtra("count", 4), com.utuvo.wallpaper.core.DailyRecipe().withCategory(AppEnv.get(context).data, "自然", true)))
             "scene" -> Log.i(TAG, "debug scene enqueued=" + com.utuvo.wallpaper.platform.Jobs.launchScene(context,
                 intent.getStringExtra("prompt") ?: "a quiet harbor at the edge of town"))
+            "auto" -> Log.i(TAG, "debug auto enqueued=" + com.utuvo.wallpaper.platform.Jobs.launchAuto(context))
             "forceDaily" -> DebugHooks.edit(context).putBoolean("forceDaily", intent.getBooleanExtra("on", true)).commit()
             "offset" -> { DebugHooks.edit(context).putLong("offset", intent.getLongExtra("ms", 0L)).commit(); Scheduler.sync(context) }
             // 把 App 時間快轉到「下一個時段開始前 N 秒」，再排鬧鐘：到點由 AlarmManager 自己觸發。

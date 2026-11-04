@@ -267,19 +267,37 @@ object Jobs {
         GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "scene", GenerateWorker.PROMPT to prompt,
             GenerateWorker.SCENE_ID to "scene-" + com.utuvo.wallpaper.core.RandomID.make()))
 
-    /** 「現在用 AI 生成一組」：交給 WorkManager。 */
-    fun launchAuto(context: Context): Boolean =
-        GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "auto"))
+    /**
+     * 「現在用 AI 生成一組」：按下去的當下就選好題目和場景 id，寫進工作輸入；
+     * 工作被中斷重跑（即使跨日、跨期）都續作同一組，不會重新選題、重付已做好的時段。
+     */
+    fun launchAuto(context: Context): Boolean {
+        val env = AppEnv.get(context)
+        val prev = AutoStateFile.read(env.paths)
+        val state = DynamicAutoPlanner.manual(env.data, prev, AppClock.now(context), env.prefs.dynamicAutoFrequency,
+            chinese = Strings.isChinese(context))
+        AutoStateFile.write(env.paths, state)
+        val ok = GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "auto",
+            GenerateWorker.PROMPT to state.prompt, GenerateWorker.SCENE_ID to state.sceneID))
+        // 沒排進去（已有工作在跑）：還原，不留下沒人做的新題目。
+        if (!ok) { if (prev != null) AutoStateFile.write(env.paths, prev) else env.paths.dynamicAutoState.delete() }
+        return ok
+    }
 
     /** 日夜 AI 自動：到期就生成一組，失敗記重試。manual＝使用者按「現在用 AI 生成一組」。 */
     fun runDynamicAuto(context: Context, manual: Boolean, isCancelled: () -> Boolean = { false },
-                       userStarted: Boolean = false): Result<String>? {
+                       userStarted: Boolean = false, fixedPrompt: String? = null, fixedSceneID: String? = null): Result<String>? {
         val env = AppEnv.get(context)
         val freq = env.prefs.dynamicAutoFrequency
         val now = AppClock.now(context)
         val chinese = Strings.isChinese(context)
         val prev = AutoStateFile.read(env.paths)
-        val state = if (manual) DynamicAutoPlanner.manual(env.data, prev, now, freq, chinese = chinese)
+        if (fixedPrompt != null && fixedSceneID != null && prev?.sceneID != fixedSceneID) {
+            // 按下時選好的那組已被別的排程蓋掉紀錄：照樣續作那一組（檔案在、已做好的不重付），不動自動紀錄。
+            return runScene(context, fixedPrompt, fixedSceneID, isCancelled, userStarted)?.onSuccess { Wallpapers.sceneReady(context) }
+        }
+        val state = if (fixedSceneID != null && prev != null) prev.copy(retryAfterEpochMs = null)
+        else if (manual) DynamicAutoPlanner.manual(env.data, prev, now, freq, chinese = chinese)
         else DynamicAutoPlanner.due(env.data, prev, now, freq, chinese = chinese) ?: return null
         val counted = state.copy(attempts = state.attempts + 1)
         AutoStateFile.write(env.paths, counted)
