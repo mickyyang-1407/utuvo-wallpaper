@@ -34,7 +34,7 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     override suspend fun doWork(): Result {
         val ctx = applicationContext
-        val kind = inputData.getString(KIND) ?: return Result.failure()
+        val kind = inputData.getString(KIND) ?: run { clearPending(ctx); return Result.failure() }
         Log.i(TAG, "generate start: $kind attempt=$runAttemptCount")
         // 每張之間檢查：被取消或被系統停掉就不再送新請求。
         val stop = { isStopped }
@@ -49,10 +49,15 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
                     Log.i(TAG, "generate progress: manual $d/$count")
                 }
             }
-            "scene" -> Jobs.runScene(ctx, inputData.getString(PROMPT) ?: "", inputData.getString(SCENE_ID), stop)
+            "scene" -> Jobs.runScene(ctx, inputData.getString(PROMPT) ?: "", inputData.getString(SCENE_ID), stop, userStarted = true)
                 ?.map { Wallpapers.sceneReady(ctx); 4 }
-            "auto" -> Jobs.runDynamicAuto(ctx, manual = true, isCancelled = stop)?.map { 4 }
-            else -> return Result.failure()
+            "auto" -> Jobs.runDynamicAuto(ctx, manual = true, isCancelled = stop, userStarted = true)?.map { 4 }
+            else -> {
+                // 未知種類（不該發生）：清掉續作紀錄，免得看門狗一直重排一個註定失敗的工作。
+                Log.w(TAG, "generate: unknown kind")
+                clearPending(ctx)
+                return Result.failure()
+            }
         }
         if (result == null) {
             Log.i(TAG, "generate busy, retry later")
@@ -100,6 +105,10 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
         const val SCENE_ID = "sceneID"
         const val DAY = "day"
         const val RUN_ID = "runID"
+        const val WATCHDOG_MS = 120_000L
+        /** 行程剛啟動時先跳過時，看門狗改排的短間隔。 */
+        const val WATCHDOG_SHORT_MS = 30_000L
+        private const val YOUNG_PROCESS_MS = 20_000L
         private const val PENDING = "gen.pending"
 
         /** Android 11 以下拿不到 stopReason：用這個旗標分辨「使用者取消」。 */
@@ -127,11 +136,11 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
          * 看門狗鬧鐘（約 2 分鐘後，不精確）：行程被殺後鬧鐘仍在，會把 App 叫起來跑 [kick]。
          * 還有沒做完的產生就再排下一次；做完、取消後自然停止。
          */
-        fun armWatchdog(context: Context) {
+        fun armWatchdog(context: Context, delayMs: Long = WATCHDOG_MS) {
             val am = context.getSystemService(android.app.AlarmManager::class.java)
             val pi = android.app.PendingIntent.getBroadcast(context, 8, android.content.Intent(context, GenerateWatchdogReceiver::class.java),
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
-            am.set(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, android.os.SystemClock.elapsedRealtime() + 120_000L, pi)
+            am.set(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, android.os.SystemClock.elapsedRealtime() + delayMs, pi)
         }
 
         fun hasPending(context: Context) = AppEnv.get(context).raw.contains(PENDING)
@@ -148,27 +157,29 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
          * （Android 16 模擬器實測）。行程啟動後與輪換工作時檢查：還有沒做完的產生、而且不是正在跑，就用同一份輸入
          * （同一個續作識別碼）重新排入。已做完的張數靠檔案沿用，不會重付。
          */
-        fun kick(context: Context) {
-            if (Jobs.isBusy()) return
+        /** 回 true＝因為行程剛啟動而先跳過（看門狗改排短間隔再查）。 */
+        fun kick(context: Context): Boolean {
+            if (Jobs.isBusy()) return false
             // 行程剛起來時 WorkManager 自己會把沒做完的工作排回去並開始跑；先讓它處理，避免兩邊互相取消。
-            if (android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() < 20_000L) return
+            if (android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() < YOUNG_PROCESS_MS) return true
             val wm = WorkManager.getInstance(context)
-            val infos = runCatching { wm.getWorkInfosForUniqueWork(UNIQUE).get() }.getOrNull() ?: return
-            if (infos.any { it.state == WorkInfo.State.RUNNING }) return
+            val infos = runCatching { wm.getWorkInfosForUniqueWork(UNIQUE).get() }.getOrNull() ?: return false
+            if (infos.any { it.state == WorkInfo.State.RUNNING }) return false
             val saved = AppEnv.get(context).raw.getString(PENDING, null)
             if (saved == null) {
                 // 沒有輸入紀錄卻卡著一個排隊中的工作（舊版本留下的）：取消，免得之後永遠顯示「另一個生成作業正在進行」。
                 if (infos.any { it.state == WorkInfo.State.ENQUEUED }) wm.cancelUniqueWork(UNIQUE)
-                return
+                return false
             }
             // 全部都結束了而且是被取消的：使用者取消過，不再重排。
             if (infos.isNotEmpty() && infos.all { it.state.isFinished } && infos.any { it.state == WorkInfo.State.CANCELLED }) {
-                clearPending(context); return
+                clearPending(context); return false
             }
             val data = runCatching { Data.fromByteArray(android.util.Base64.decode(saved, android.util.Base64.NO_WRAP)) }.getOrNull()
-                ?: run { clearPending(context); return }
+                ?: run { clearPending(context); return false }
             Log.i(TAG, "generate kick: re-enqueue unfinished work")
             submit(wm, data, ExistingWorkPolicy.REPLACE)
+            return false
         }
     }
 }
@@ -180,8 +191,10 @@ class GenerateWatchdogReceiver : android.content.BroadcastReceiver() {
         Thread {
             try {
                 if (GenerateWorker.hasPending(context)) {
-                    GenerateWorker.kick(context)
-                    GenerateWorker.armWatchdog(context)
+                    val skippedYoung = GenerateWorker.kick(context)
+                    // 這次是看門狗把 App 冷啟動的，剛啟動先跳過：30 秒後再查一次，不要等 2 分鐘又冷啟動又跳過。
+                    GenerateWorker.armWatchdog(context, if (skippedYoung) GenerateWorker.WATCHDOG_SHORT_MS else GenerateWorker.WATCHDOG_MS)
+                    Log.i("UTUVOWallpaper", "generate watchdog: skippedYoung=$skippedYoung")
                 }
             } finally {
                 pending.finish()

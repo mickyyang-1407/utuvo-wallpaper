@@ -332,6 +332,8 @@ class SceneGenerationService(
         }
         val baseFile = File(dir, "day.png")
         val base = if (baseFile.isFile) baseFile.readBytes() else {
+            // 第一個付費請求送出前也要檢查是否已取消。
+            if (isCancelled()) throw GenerationError.Cancelled
             provider.generateImage(DayPhase.basePrompt(prompt)).also {
                 if (codec.pixelSize(it) == null) throw GenerationError.Decoding
                 Files.write(it, baseFile)

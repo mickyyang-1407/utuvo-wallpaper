@@ -73,7 +73,7 @@ fun GenerateSheet(model: AppModel, dismiss: () -> Unit) {
                 Text(stringResource(R.string.can_close), color = Palette.secondary, fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
                 Row {
-                    if (r.kind != "daily") {
+                    if (r.cancellable) {
                         TextButton({ Jobs.cancelGenerate(ctx) }, Modifier.testTag("cancel-generate")) {
                             Text(stringResource(R.string.cancel), color = Palette.red)
                         }

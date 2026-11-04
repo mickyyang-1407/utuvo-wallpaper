@@ -124,17 +124,21 @@ fun DynamicScreen(model: AppModel) {
             }
             Spacer(Modifier.height(8.dp))
             val r = running
+            val missingKey = stringResource(R.string.err_missing_key)
+            val busyText = stringResource(R.string.busy)
             if (r != null && r.kind == "scene") {
                 Text(stringResource(R.string.scene_progress, r.done))
                 LinearProgressIndicator({ r.done / 4f }, Modifier.fillMaxWidth(), color = Palette.accent)
-                androidx.compose.material3.TextButton({ Jobs.cancelGenerate(ctx) }) { Text(stringResource(R.string.cancel), color = Palette.red) }
+                if (r.cancellable) {
+                    androidx.compose.material3.TextButton({ Jobs.cancelGenerate(ctx) }) { Text(stringResource(R.string.cancel), color = Palette.red) }
+                }
             } else if (auto == DynamicAutoFrequency.OFF) {
                 OutlinedTextField(scene, { scene = it }, Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.scene_example)) })
                 Spacer(Modifier.height(8.dp))
                 Button({
                     note = when {
-                        !Providers.canGenerate(ctx) -> ctx.getString(R.string.err_missing_key)
-                        !Jobs.launchScene(ctx, scene) -> ctx.getString(R.string.busy)
+                        !Providers.canGenerate(ctx) -> missingKey
+                        !Jobs.launchScene(ctx, scene) -> busyText
                         else -> null
                     }
                 }, Modifier.fillMaxWidth(), enabled = scene.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = Palette.accent)) {
@@ -149,8 +153,8 @@ fun DynamicScreen(model: AppModel) {
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton({
-                    note = if (!Providers.canGenerate(ctx)) ctx.getString(R.string.err_missing_key) else null
-                    if (note == null && !Jobs.launchAuto(ctx)) note = ctx.getString(R.string.busy)
+                    note = if (!Providers.canGenerate(ctx)) missingKey else null
+                    if (note == null && !Jobs.launchAuto(ctx)) note = busyText
                 }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.ai_now)) }
                 Text(stringResource(R.string.ai_cost), fontSize = 12.sp, color = Palette.secondary)
             }

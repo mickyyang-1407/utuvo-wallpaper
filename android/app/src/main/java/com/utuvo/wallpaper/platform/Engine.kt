@@ -185,7 +185,8 @@ object Wallpapers {
 
 /** 一次只跑一個生成作業（手動、每日、日夜都共用）。進度給介面看。 */
 object Jobs {
-    data class State(val kind: String, val done: Int, val total: Int)
+    /** [cancellable]＝使用者自己開始的產生（GenerateWorker）；排程跑的每日批次／AI 場景不給取消鈕。 */
+    data class State(val kind: String, val done: Int, val total: Int, val cancellable: Boolean = false)
     val running = MutableStateFlow<State?>(null)
     /** 最近一次完成／失敗的訊息 key（給介面顯示，顯示後清空）。 */
     val finished = MutableStateFlow<Result<Pair<String, Int>>?>(null)
@@ -193,11 +194,11 @@ object Jobs {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** 拿到鎖才跑；拿不到回 false。 */
-    fun <T> exclusive(kind: String, total: Int, work: ((Int, Int) -> Unit) -> T): Result<T>? {
+    fun <T> exclusive(kind: String, total: Int, cancellable: Boolean = false, work: ((Int, Int) -> Unit) -> T): Result<T>? {
         if (!busy.compareAndSet(false, true)) return null
-        running.value = State(kind, 0, total)
+        running.value = State(kind, 0, total, cancellable)
         return try {
-            Result.success(work { d, t -> running.value = State(kind, d, t) })
+            Result.success(work { d, t -> running.value = State(kind, d, t, cancellable) })
         } catch (e: Throwable) {
             Result.failure(e)
         } finally {
@@ -234,7 +235,7 @@ object Jobs {
     fun runManual(context: Context, count: Int, recipe: DailyRecipe, runID: String, day: String,
                   isCancelled: () -> Boolean, progress: (Int) -> Unit): Result<Int>? {
         val env = AppEnv.get(context)
-        return exclusive("manual", count) { p ->
+        return exclusive("manual", count, cancellable = true) { p ->
             daily(context, env, recipe, isCancelled).runManual(day, count, progress = { d, t -> progress(d); p(d, t) }, runID = runID).size
         }
     }
@@ -248,11 +249,12 @@ object Jobs {
     }
 
     /** 日夜場景生成（同 id 續作不重付）。完成後只把場景設成新的（跟 iPhone 一樣不自動開日夜）。 */
-    fun runScene(context: Context, prompt: String, id: String? = null, isCancelled: () -> Boolean = { false }): Result<String>? {
+    fun runScene(context: Context, prompt: String, id: String? = null, isCancelled: () -> Boolean = { false },
+                 userStarted: Boolean = false): Result<String>? {
         val env = AppEnv.get(context)
         val (w, h) = DeviceScreen.nativePixels(context)
         val svc = SceneGenerationService(Providers.make(context), env.paths, BitmapCodec, w, h, isCancelled)
-        return exclusive("scene", 4) { p ->
+        return exclusive("scene", 4, cancellable = userStarted) { p ->
             val step: (Int) -> Unit = { Log.i(TAG, "scene progress: $it/4"); p(it, 4) }
             val rec = if (id != null) svc.generate(prompt, id, step) else svc.generate(prompt, progress = step)
             env.prefs.dynamicSceneID = rec.id
@@ -270,7 +272,8 @@ object Jobs {
         GenerateWorker.enqueue(context, workDataOf(GenerateWorker.KIND to "auto"))
 
     /** 日夜 AI 自動：到期就生成一組，失敗記重試。manual＝使用者按「現在用 AI 生成一組」。 */
-    fun runDynamicAuto(context: Context, manual: Boolean, isCancelled: () -> Boolean = { false }): Result<String>? {
+    fun runDynamicAuto(context: Context, manual: Boolean, isCancelled: () -> Boolean = { false },
+                       userStarted: Boolean = false): Result<String>? {
         val env = AppEnv.get(context)
         val freq = env.prefs.dynamicAutoFrequency
         val now = AppClock.now(context)
@@ -280,7 +283,7 @@ object Jobs {
         else DynamicAutoPlanner.due(env.data, prev, now, freq, chinese = chinese) ?: return null
         val counted = state.copy(attempts = state.attempts + 1)
         AutoStateFile.write(env.paths, counted)
-        val r = runScene(context, state.prompt, state.sceneID, isCancelled) ?: return null
+        val r = runScene(context, state.prompt, state.sceneID, isCancelled, userStarted) ?: return null
         r.onSuccess {
             AutoStateFile.write(env.paths, counted.recordSuccess())
             Wallpapers.sceneReady(context)

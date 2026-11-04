@@ -129,6 +129,20 @@ class DeviceTest {
         com.utuvo.wallpaper.platform.BootReceiver().onReceive(ctx, android.content.Intent())
     }
 
+    /** 工作輸入缺 kind 或 kind 不認得：回 failure 並清掉續作紀錄（不然看門狗會一直重排）。 */
+    @Test fun generateWorkerClearsPendingOnBadInput() {
+        val raw = AppEnv.get(ctx).raw
+        for (input in listOf(androidx.work.Data.EMPTY, androidx.work.workDataOf("kind" to "bogus"))) {
+            raw.edit().putString("gen.pending", "x").commit()
+            assertTrue(com.utuvo.wallpaper.platform.GenerateWorker.hasPending(ctx))
+            val worker = androidx.work.testing.TestListenableWorkerBuilder<com.utuvo.wallpaper.platform.GenerateWorker>(ctx)
+                .setInputData(input).build()
+            val result = kotlinx.coroutines.runBlocking { worker.doWork() }
+            assertEquals(androidx.work.ListenableWorker.Result.failure(), result)
+            assertEquals(false, com.utuvo.wallpaper.platform.GenerateWorker.hasPending(ctx))
+        }
+    }
+
     private fun hash(b: Bitmap): String {
         val px = IntArray(b.width * b.height)
         b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
