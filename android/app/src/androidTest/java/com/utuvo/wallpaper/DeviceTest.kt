@@ -150,7 +150,9 @@ class DeviceTest {
         assertEquals(2, com.utuvo.wallpaper.platform.GenerateWorker.MAX_YOUNG_SKIPS)
         // 計數在清掉續作紀錄時歸零，不會帶到下一次產生。
         val raw = AppEnv.get(ctx).raw
-        raw.edit().putString("gen.pending", "x").putInt(com.utuvo.wallpaper.platform.GenerateWorker.YOUNG_SKIPS, 2).commit()
+        raw.edit().putString("gen.pending", "x").putString(com.utuvo.wallpaper.platform.GenerateWorker.YOUNG_SKIPS, "old-run:2").commit()
+        // 輸入無法解碼時沒有識別碼。
+        assertEquals(null, com.utuvo.wallpaper.platform.GenerateWorker.currentRunId(ctx))
         com.utuvo.wallpaper.platform.GenerateWorker.clearPending(ctx)
         assertEquals(false, raw.contains(com.utuvo.wallpaper.platform.GenerateWorker.YOUNG_SKIPS))
     }

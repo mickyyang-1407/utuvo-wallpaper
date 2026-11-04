@@ -148,6 +148,11 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
         fun hasPending(context: Context) = AppEnv.get(context).raw.contains(PENDING)
 
+        /** 目前待續作那次產生的識別碼；沒有待續作回 null。 */
+        fun currentRunId(context: Context): String? = AppEnv.get(context).raw.getString(PENDING, null)?.let { saved ->
+            runCatching { Data.fromByteArray(android.util.Base64.decode(saved, android.util.Base64.NO_WRAP)).getString(RUN_ID) }.getOrNull()
+        }
+
         private fun submit(wm: WorkManager, data: Data, policy: ExistingWorkPolicy) {
             wm.enqueueUniqueWork(UNIQUE, policy, OneTimeWorkRequestBuilder<GenerateWorker>()
                 .setInputData(data).setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build())
@@ -198,10 +203,13 @@ class GenerateWatchdogReceiver : android.content.BroadcastReceiver() {
             try {
                 if (GenerateWorker.hasPending(context)) {
                     val raw = AppEnv.get(context).raw
-                    val skips = raw.getInt(GenerateWorker.YOUNG_SKIPS, 0)
+                    // 次數跟「這一次產生」的續作識別碼綁在一起：別次產生留下（或晚寫回）的次數一律當 0。
+                    val run = GenerateWorker.currentRunId(context) ?: ""
+                    val stored = runCatching { raw.getString(GenerateWorker.YOUNG_SKIPS, null) }.getOrNull()?.split(":", limit = 2)
+                    val skips = if (stored?.size == 2 && stored[0] == run) stored[1].toIntOrNull() ?: 0 else 0
                     // 最多連續短間隔跳過 2 次；之後即使又是剛冷啟動也直接檢查，不會變成每 30 秒叫醒一次的無限循環。
                     val skippedYoung = GenerateWorker.kick(context, ignoreYoung = skips >= GenerateWorker.MAX_YOUNG_SKIPS)
-                    raw.edit().putInt(GenerateWorker.YOUNG_SKIPS, if (skippedYoung) skips + 1 else 0).commit()
+                    raw.edit().putString(GenerateWorker.YOUNG_SKIPS, "$run:${if (skippedYoung) skips + 1 else 0}").commit()
                     // 這次是看門狗把 App 冷啟動的，剛啟動先跳過：30 秒後再查一次，不要等 2 分鐘又冷啟動又跳過。
                     GenerateWorker.armWatchdog(context, if (skippedYoung) GenerateWorker.WATCHDOG_SHORT_MS else GenerateWorker.WATCHDOG_MS)
                     Log.i("UTUVOWallpaper", "generate watchdog: skippedYoung=$skippedYoung skips=$skips")
