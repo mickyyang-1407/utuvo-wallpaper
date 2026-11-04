@@ -108,6 +108,8 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
         const val WATCHDOG_MS = 120_000L
         /** 行程剛啟動時先跳過時，看門狗改排的短間隔。 */
         const val WATCHDOG_SHORT_MS = 30_000L
+        const val YOUNG_SKIPS = "gen.watchdog.youngSkips"
+        const val MAX_YOUNG_SKIPS = 2
         private const val YOUNG_PROCESS_MS = 20_000L
         private const val PENDING = "gen.pending"
 
@@ -158,10 +160,11 @@ class GenerateWorker(context: Context, params: WorkerParameters) : CoroutineWork
          * （同一個續作識別碼）重新排入。已做完的張數靠檔案沿用，不會重付。
          */
         /** 回 true＝因為行程剛啟動而先跳過（看門狗改排短間隔再查）。 */
-        fun kick(context: Context): Boolean {
+        fun kick(context: Context, ignoreYoung: Boolean = false): Boolean {
             if (Jobs.isBusy()) return false
             // 行程剛起來時 WorkManager 自己會把沒做完的工作排回去並開始跑；先讓它處理，避免兩邊互相取消。
-            if (android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() < YOUNG_PROCESS_MS) return true
+            // ignoreYoung：看門狗已連續短間隔跳過幾次（每次都剛好冷啟動），不再等，直接檢查。
+            if (!ignoreYoung && android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() < YOUNG_PROCESS_MS) return true
             val wm = WorkManager.getInstance(context)
             val infos = runCatching { wm.getWorkInfosForUniqueWork(UNIQUE).get() }.getOrNull() ?: return false
             if (infos.any { it.state == WorkInfo.State.RUNNING }) return false
@@ -191,10 +194,14 @@ class GenerateWatchdogReceiver : android.content.BroadcastReceiver() {
         Thread {
             try {
                 if (GenerateWorker.hasPending(context)) {
-                    val skippedYoung = GenerateWorker.kick(context)
+                    val raw = AppEnv.get(context).raw
+                    val skips = raw.getInt(GenerateWorker.YOUNG_SKIPS, 0)
+                    // 最多連續短間隔跳過 2 次；之後即使又是剛冷啟動也直接檢查，不會變成每 30 秒叫醒一次的無限循環。
+                    val skippedYoung = GenerateWorker.kick(context, ignoreYoung = skips >= GenerateWorker.MAX_YOUNG_SKIPS)
+                    raw.edit().putInt(GenerateWorker.YOUNG_SKIPS, if (skippedYoung) skips + 1 else 0).commit()
                     // 這次是看門狗把 App 冷啟動的，剛啟動先跳過：30 秒後再查一次，不要等 2 分鐘又冷啟動又跳過。
                     GenerateWorker.armWatchdog(context, if (skippedYoung) GenerateWorker.WATCHDOG_SHORT_MS else GenerateWorker.WATCHDOG_MS)
-                    Log.i("UTUVOWallpaper", "generate watchdog: skippedYoung=$skippedYoung")
+                    Log.i("UTUVOWallpaper", "generate watchdog: skippedYoung=$skippedYoung skips=$skips")
                 }
             } finally {
                 pending.finish()

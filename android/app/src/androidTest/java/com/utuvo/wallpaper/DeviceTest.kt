@@ -143,6 +143,13 @@ class DeviceTest {
         }
     }
 
+    @Test fun kickIgnoringYoungProcessNeverAsksForAnotherShortWait() {
+        // 看門狗連續短間隔跳過 2 次後會用 ignoreYoung；這時 kick 不可再回 true（否則每 30 秒叫醒一次、永遠循環）。
+        AppEnv.get(ctx).raw.edit().remove("gen.pending").commit()
+        assertEquals(false, com.utuvo.wallpaper.platform.GenerateWorker.kick(ctx, ignoreYoung = true))
+        assertEquals(2, com.utuvo.wallpaper.platform.GenerateWorker.MAX_YOUNG_SKIPS)
+    }
+
     private fun hash(b: Bitmap): String {
         val px = IntArray(b.width * b.height)
         b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
