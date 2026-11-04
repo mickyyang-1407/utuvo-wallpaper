@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 簡單前景：圓角畫框＋山與太陽（App 圖示正式版另做）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#3B82F6" android:pathData="M38,30h32a6,6 0,0 1,6 6v36a6,6 0,0 1,-6 6h-32a6,6 0,0 1,-6 -6v-36a6,6 0,0 1,6 -6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M34,70l14,-16l9,10l6,-7l11,13v2a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6z" />
+    <path android:fillColor="#FF9F0A" android:pathData="M64,44m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+</vector>

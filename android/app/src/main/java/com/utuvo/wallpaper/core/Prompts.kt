@@ -157,6 +157,7 @@ object PortraitPrompt {
         "vertical 9:16 iPhone wallpaper, leave the top fifth of the frame uncluttered for the lock-screen clock"
 
     private const val MARKER = "vertical 9:16 iPhone wallpaper"
+    private const val WHITESPACE = "[\\t\\n\\f\\r\\p{Z}]"
 
     private val rules: List<Pair<Regex, String>> = listOf(
         "vertical texture yet wide 16:9 framing" to "vertical framing",
@@ -168,8 +169,9 @@ object PortraitPrompt {
         """desktop\s+landscape""" to "phone landscape",
         "calm horizontal rhythm" to "calm layered rhythm",
     ).map { (p, r) ->
-        // ICU（NSRegularExpression）的 \s 與大小寫不分都是 Unicode 版。
-        Regex("(?iU)$p") to r
+        // ICU（NSRegularExpression）的 \s＝[\t\n\f\r\p{Z}]、大小寫不分是 Unicode 版。
+        // 不用 (?U)：Android 的 ICU regex 不支援 UNICODE_CHARACTER_CLASS（會丟 PatternSyntaxException）。
+        Regex("(?iu)" + p.replace("\\s", WHITESPACE)) to r
     }
 
     /** 純函式：把橫式字樣換成直式，並補上時鐘區留白的說明。 */

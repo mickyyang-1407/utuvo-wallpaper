@@ -141,6 +141,41 @@ class BatchTest {
         }
     }
 
+    @Test fun undecodableImageStopsTheDayWithoutRepaying() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val provider = ScriptedProvider("garbage".toByteArray())
+        try { service(provider, paths, aiOnly).run(day); fail() } catch (e: GenerationError) {
+            assertEquals(GenerationError.Decoding, e)
+        }
+        val batch = DailyBatch.load(paths.root, day)
+        assertNull(batch.retryAfterMs)
+        assertEquals(1, batch.attempts[0])
+        assertFalse(batch.canResume(now + 86_400_000))
+        assertFalse(DailyGenerationService.hasWork(paths, day, now + 86_400_000))
+        assertEquals(1, provider.prompts.size)
+    }
+
+    @Test fun providerErrorStillWritesTheCooldown() {
+        val paths = AppPaths(TestSupport.tempDir())
+        val provider = object : ImageProvider {
+            override fun generateImage(prompt: String): ByteArray = throw OutOfMemoryError("test")
+            override fun relight(reference: ByteArray, prompt: String): ByteArray = throw OutOfMemoryError("test")
+        }
+        try { service(provider, paths, aiOnly).run(day); fail() } catch (e: OutOfMemoryError) {}
+        val batch = DailyBatch.load(paths.root, day)
+        assertEquals(1, batch.attempts[0])
+        assertNull(batch.retryAfterMs)
+    }
+
+    @Test fun atomicWriteReplacesWithoutLeavingTemp() {
+        val dir = TestSupport.tempDir()
+        val f = java.io.File(dir, "daily-x.json")
+        Files.write("one".toByteArray(), f)
+        Files.write("two".toByteArray(), f)
+        assertEquals("two", f.readText())
+        assertFalse(java.io.File(dir, ".daily-x.json.tmp").exists())
+    }
+
     @Test fun mismatchedProgressFileIsRejected() {
         val paths = AppPaths(TestSupport.tempDir())
         DailyBatch(5, emptyList(), List(5) { 0 }, now, null).save(paths.root, day)

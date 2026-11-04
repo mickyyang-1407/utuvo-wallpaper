@@ -1,0 +1,42 @@
+package com.utuvo.wallpaper.ui
+
+import com.utuvo.wallpaper.R
+
+/** core 以繁中當 key 回傳的文字 → strings.xml。 */
+internal val CORE_KEYS: Map<String, Int> = mapOf(
+    "其他" to R.string.k_other,
+    "自然" to R.string.k_nature,
+    "極簡" to R.string.k_minimal,
+    "抽象" to R.string.k_abstract,
+    "插畫" to R.string.k_illustration,
+    "宇宙" to R.string.k_cosmic,
+    "水彩" to R.string.k_watercolor,
+    "建築" to R.string.k_architecture,
+    "動畫" to R.string.k_animation,
+    "純色" to R.string.k_solid,
+    "漸層" to R.string.k_gradient,
+    "深色" to R.string.k_dark,
+    "幾何" to R.string.k_geometric,
+    "城市" to R.string.k_city,
+    "動物" to R.string.k_animals,
+    "3D" to R.string.k_3d,
+    "自然風景" to R.string.k_t_landscape,
+    "紙雕極簡" to R.string.k_t_paper,
+    "流動光帶" to R.string.k_t_ribbons,
+    "插畫街景" to R.string.k_t_streets,
+    "深空" to R.string.k_t_space,
+    "自然微距" to R.string.k_t_macro,
+    "水彩風景" to R.string.k_t_wc,
+    "建築光影" to R.string.k_t_arch,
+    "手繪動畫" to R.string.k_t_hand,
+    "柔和漸層" to R.string.k_t_soft,
+    "3D 立體" to R.string.k_t_3d,
+    "流光" to R.string.k_l_flow,
+    "湖畔晨光" to R.string.k_l_lake,
+    "紙上山丘" to R.string.k_l_hills,
+    "逾時" to R.string.k_f_timeout,
+    "連線中斷" to R.string.k_f_transport,
+    "被中斷" to R.string.k_f_cancel,
+    "額度或限流" to R.string.k_f_429,
+    "回應無法解析" to R.string.k_f_parse,
+)

@@ -4,6 +4,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.StandardCopyOption
 
 /**
  * 影像編解碼（平台相關的部分）。B 段用 `BitmapFactory`／`Bitmap.compress` 實作；
@@ -51,17 +53,21 @@ object ImageHeaders {
 object Files {
     /** 原子寫入；失敗丟 [GenerationError.WriteFailed]。 */
     fun write(bytes: ByteArray, to: File) {
+        val tmp = File(to.parentFile, ".${to.name}.tmp")
         try {
             to.parentFile?.mkdirs()
-            val tmp = File(to.parentFile, ".${to.name}.tmp")
             tmp.writeBytes(bytes)
-            if (!tmp.renameTo(to)) {
-                to.delete()
-                if (!tmp.renameTo(to)) throw IOException("rename")
+            // 原子取代；不支援 ATOMIC_MOVE 時退回一般取代。絕不先刪舊檔（失敗時舊進度還在）。
+            try {
+                java.nio.file.Files.move(tmp.toPath(), to.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (e: AtomicMoveNotSupportedException) {
+                java.nio.file.Files.move(tmp.toPath(), to.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
         } catch (e: IOException) {
+            tmp.delete()
             throw GenerationError.WriteFailed
         } catch (e: SecurityException) {
+            tmp.delete()
             throw GenerationError.WriteFailed
         }
     }
@@ -199,14 +205,17 @@ class DailyGenerationService(
                 batch = batch.copy(attempts = attempts, retryAfterMs = nowMs() + RetryPolicy.LATER_COOLDOWN_SECONDS * 1000)
                 batch.save(paths.root, day)
                 png = try {
-                    provider.generateImage(PortraitPrompt.convert(planned.prompt))
-                } catch (e: Exception) {
+                    // 解碼檢查放在同一個 try：解不開（不可重試）也走同一段冷卻規則，停住這批，不再付費重打。
+                    provider.generateImage(PortraitPrompt.convert(planned.prompt)).also {
+                        if (codec.pixelSize(it) == null) throw GenerationError.Decoding
+                    }
+                } catch (e: Throwable) {
+                    // Throwable：provider 丟 Error（例如記憶體不足）也要寫回冷卻，不然 retryAfter 會停在請求前的 +300 秒。
                     val cooldown = RetryPolicy.cooldownSeconds(attempts[index], RetryPolicy.isResumable(e))
                     batch = batch.copy(retryAfterMs = cooldown?.let { nowMs() + it * 1000 })
                     batch.save(paths.root, day)
                     throw e
                 }
-                if (codec.pixelSize(png) == null) throw GenerationError.Decoding
                 Files.write(png, native)
             }
             val size = codec.pixelSize(png) ?: throw GenerationError.Decoding
@@ -419,7 +428,7 @@ class LoggingImageProvider(
             return bytes
         } catch (e: GenerationError.EmptyPrompt) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             GenerationLog.append(GenerationLogEntry(start, kind, GenerationLog.outcome(e), (nowMs() - start) / 1000.0), paths)
             throw e
         }

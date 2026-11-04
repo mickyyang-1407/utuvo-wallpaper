@@ -14,6 +14,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    sourceSets {
+        // 示範圖（圖庫一張＋日夜四段）直接用 repo 根目錄的 Assets/Demo，不複製第二份。
+        getByName("main").assets.srcDir("../../Assets/Demo")
     }
 
     buildFeatures {
@@ -62,6 +68,11 @@ dependencies {
     implementation("androidx.work:work-runtime:2.11.2")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("org.json:json:20250517")
     testImplementation("com.squareup.okhttp3:mockwebserver3:5.5.0")
 }
