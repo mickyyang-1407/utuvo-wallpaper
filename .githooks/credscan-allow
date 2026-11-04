@@ -1,2 +1,4 @@
 a5357ce1b6d6ef607804791a1817d4cb005ea7521b57fc92d420ef499316d024  # Assets/Demo/dynamic/mountain-hours/mountain-hours.heic: bundled demo image, too large for credscan; strings-scanned by hand
 5b8ecb8770e27a575849500096d2c9059b90dbca1387b56eed77148871fb4e87  # docs/assets/hero-en.jpg: 7 random bytes inside JPEG entropy-coded data (after SOS at 425) look like an email; no EXIF/XMP/comment segments
+655d7cd784c63550a458e774fdaaba4d74d660f68ae5ac7ac722fbbdcc11d0ed  # android/app/src/main/assets/prompts.json — time-zone city coordinates (long decimals), not card numbers
+d1bc5254409499e08aa6bbf7e1ea86be1db87fa80841d9b778c3d8e06b2a18f9  # android/app/src/test/resources/golden.json — time-zone city coordinates (long decimals), not card numbers
